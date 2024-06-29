@@ -1,0 +1,18 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Host APROM Debug",
+      "preLaunchTask": "Build Host APROM",
+      "cwd": "${workspaceFolder}",
+      "executable": "./obj/host_aprom.elf",
+      "request": "launch",
+      "type": "cortex-debug",
+      "runToEntryPoint": "_start",
+      "servertype": "openocd",
+      "serverpath": "../../openocd-0.12.0-3/bin/openocd",
+      "configFiles": ["interface/stlink-v2.cfg", "../../nucxxx.cfg"],
+      "showDevDebugOutput": "raw",
+    }
+  ]
+}

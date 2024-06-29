@@ -1,0 +1,7 @@
+# Picolibc
+picolibc/*
+# Misc testing files
+*.py
+# Build artifacts
+obj/*
+host_aprom.bin

@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Host APROM",
+      "command": "make",
+      "args": [
+        "-j",
+        "all"
+      ],
+      "type": "shell",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    }
+  ]
+}

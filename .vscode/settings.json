@@ -1,0 +1,16 @@
+{
+  "clangd.arguments": ["--query-driver=*arm-none-eabi-*"],
+  "clangd.fallbackFlags": [
+    "-IC:/Program Files (x86)/GNU Arm Embedded Toolchain/13.2 Rel1/arm-none-eabi/include",
+    "-I${workspaceFolder}/NUC123/inc",
+    "-I${workspaceFolder}/NUC123/StdDriver/inc",
+    "-D__GNUC__",
+    "-Wno-pointer-to-int-cast",
+    "-Wno-int-to-pointer-cast",
+  ],
+  "cortex-debug.variableUseNaturalFormat": true,
+  "cortex-debug.liveWatchRefreshRate": 1000,
+  "cortex-debug.enableTelemetry": false,
+  "files.trimFinalNewlines": true,
+  "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
+}
