@@ -4,6 +4,41 @@ See [Development](./Development.md) for development information.
 
 Yes, the code is a mess. I just wanted to get something onto git y'know :).
 
+## Setup
+### Installing Firmware
+- Disconnect the PC cable from the TASOLLER
+- Hold down the FN2 button, while reconnecting the PC cable
+- `HOSTMCU` should show as a device
+- Use `Update V1.1.exe` from official firmware updates to load the firmware
+
+Currently, Dao CFW is required on the LED board. This is controlled by `LED_FIRMWARE_CFW` in `src/led.h`.
+
+### Configuring segatools
+This firmware emulates arcade IO. As such, segatools' emulation should be disabled, by adding the following lines:
+
+```ini
+[slider]
+enable=0
+[io4]
+enable=0
+```
+
+Ensure no other `[slider]` section exists in the file (or if it does, set `enable=0` there instead).
+
+The slider **MUST** be assigned to port `COM1`. To do this:
+
+- Go to `Devices and Printers` in control panel
+- Double click `TASOLLER`
+- In the `Hardware` tab, double click `USB Serial Device`
+  - If this already reads `USB Serial Device (COM1)` nothing needs done
+- Click `Change settings`
+- Go to `Port Settings` -> `Advanced...`
+- Under the dropdown for `COM Port Number:` select `COM1`
+
+If `COM1` is already in use, check what device it is assigned to in Device Manager under `Ports (COM & LPT)`. You may need to enable `View` -> `Show hidden devices`.
+
+Pre-chusan Chunithm uses IO3. This firmware does not (and unfortunately cannot) support IO3. It is recommended to enable the HID keyboard mode, and continue to use keyboard input for IRs.
+
 ## Configuration
 Hold FN2 for configuration. It is not the same as stock DAO.
 

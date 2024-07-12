@@ -3,6 +3,13 @@
 #include <stdio.h>
 #include <string.h>
 
+#if defined(__CC_ARM)
+#elif defined(__GNUC__)
+#define __packed __attribute__((packed))
+#else
+#error Unknown compiler
+#endif
+
 #define ms *1000
 #define kHz *1000
 
@@ -53,7 +60,7 @@ extern volatile uint8_t gu8LEDTx[LED_Tx_BUFFER];
 #define IO4_PID 0x0021
 
 #define INCR(x, y) ((x) = (x) < (y) ? (x) + 1 : (y))
-#define DECR(x, y) ((x) = (x) > (y) ? (x) - 1 : (y))
+#define DECR(x, y) ((x) = (x) > (y) ? (x)-1 : (y))
 #define MOD_INCR(x, y) ((x) = (x) == ((y)-1) ? 0 : ((x) + 1))
 #define MOD_DECR(x, y) ((x) = (x) == 0 ? ((y)-1) : ((x)-1))
 #define INV(x) ((x) = 1 - (x))
@@ -78,11 +85,11 @@ enum {
 #define NUM_AIR 6
 #define NUM_GROUND 32
 
-typedef struct __attribute__((packed)) {
+typedef struct __packed {
     uint8_t bReportId;
     uint8_t bKeyboard[NUM_FN + NUM_AIR + NUM_GROUND];
 } hid_report_t;
-typedef struct __attribute__((packed)) {
+typedef struct __packed {
     uint8_t bReportId;
     uint16_t wADC[8];
     uint16_t wRotary[4];
@@ -92,12 +99,12 @@ typedef struct __attribute__((packed)) {
     uint8_t bUsbStatus;
     uint8_t bUnique[29];
 } io4_hid_in_t;
-typedef struct __attribute__((packed)) {
+typedef struct __packed {
     uint8_t bReportId;
     uint8_t bCmd;
     uint8_t bData[62];
 } io4_hid_out_t;
-typedef struct __attribute__((packed)) {
+typedef struct __packed {
     uint8_t bReportId;
     uint16_t wData[16];
 } debug_hid_report_t;
@@ -110,7 +117,7 @@ uint8_t *USBD_HID_GetReport(uint8_t u8ReportId, uint32_t *pu32Size);
 void USBD_HID_SetReport(volatile uint8_t *pu8EpBuf, uint32_t u32Size);
 
 // For CDC
-typedef struct __attribute__((packed)) {
+typedef struct __packed {
     uint32_t u32DTERate;   // Baud rate
     uint8_t u8CharFormat;  // Stop bit
     uint8_t u8ParityType;  // Parity

@@ -1,8 +1,6 @@
 #include "tasoller.h"
 
 usb_setup_t g_usbd_SetupPacket;
-// uint8_t g_usbd_SetupPacket[8] = { 0 };
-// static const usb_setup_t* p_usbd_SetupPacket = (usb_setup_t*)&g_usbd_SetupPacket;
 volatile uint8_t g_usbd_RemoteWakeupEn = 0;
 
 volatile uint8_t *g_usbd_CtrlInPointer = 0;

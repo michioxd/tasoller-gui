@@ -99,6 +99,24 @@ __Vectors:
 
 
 Reset_Handler:
+    //  Unlock Register
+	ldr     r0, =0x50000100  // REGCTL
+	movs    r1, #0x59
+	str     r1, [r0]
+	movs    r1, #0x16
+	str     r1, [r0]
+	movs    r1, #0x88
+	str     r1, [r0]
+    // Init POR
+	ldr     r2, =0x50000024  // PORCTL
+	movs    r1, #0x5A
+    lsls    r1,r1,8
+    adds    r1,r1,#0xA5
+	str     r1, [r2]
+    // Lock registers
+	movs    r1, #0
+	str     r1, [r0]
+
     /*  Single section scheme.
      *
      *  The ranges of copy from/to are specified by following symbols
@@ -113,12 +131,12 @@ Reset_Handler:
     ldr r3, = __data_end__
 
     subs    r3, r2
-    ble .L_loop1_done
+    ble     .L_loop1_done
 .L_loop1:
     subs    r3, #4
-    ldr r0, [r1, r3]
-    str r0, [r2, r3]
-    bgt .L_loop1
+    ldr     r0, [r1, r3]
+    str     r0, [r2, r3]
+    bgt     .L_loop1
 .L_loop1_done:
 
     /*  Single BSS section scheme.
@@ -135,15 +153,12 @@ Reset_Handler:
     movs    r0, 0
 
     subs    r2, r1
-    ble .L_loop3_done
+    ble     .L_loop3_done
 .L_loop3:
     subs    r2, #4
-    str r0, [r1, r2]
-    bgt .L_loop3
+    str     r0, [r1, r2]
+    bgt     .L_loop3
 .L_loop3_done:
-
-    /* There's no SystemInit for NUC123, so no point making a pointless call */
-    // bl  SystemInit
 
 #ifndef __ENTRY
 #define __ENTRY _entry
@@ -218,7 +233,7 @@ Default_Handler:
 SH_DoCommand:
 
     BKPT   0xAB                /* ; Wait ICE or HardFault */
-    //LDR    R3, = SH_Return
+    //ldr    R3, = SH_Return
     MOV    R4, lr
     BLX    R3                  /* ; Call SH_Return. The return value is in R0 */
     BX     R4                  /* ; Return value = R0 */

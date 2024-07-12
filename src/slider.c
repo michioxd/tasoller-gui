@@ -2,10 +2,18 @@
 
 #define SLIDER_SYNC 0xFF
 #define SLIDER_MARK 0xFD
+#define SLIDER_MARKED_SYNC 0xFE
+#define SLIDER_MARKED_MARK 0xFC
 
 static uint8_t su8AutoEnabled = 0;
-static uint8_t su8GotLedData = 0;
+static uint8_t su8AutoEnabledRaw = 0;
+static uint8_t su8AutoEnabledByte = 0;
 static uint32_t su32SinceLastControlled = 0;
+
+uint8_t gu8GameBrightness = 40;  // TODO: Actually make use of this
+
+static uint16_t su16ByteRawSliderOffset = 0;
+static uint8_t su8ByteRawSliderShift = 0;
 
 typedef enum {
     SLIDER_PARSE_SYNC_WAIT = 0,
@@ -15,21 +23,8 @@ typedef enum {
     SLIDER_PARSE_CHECKSUM,
 } slider_parse_state;
 
-typedef enum {
-    SLIDER_CMD_AUTO = 0x01,
-    SLIDER_CMD_SET_LED = 0x02,
-    SLIDER_CMD_AUTO_START = 0x03,
-    SLIDER_CMD_AUTO_STOP = 0x04,
-    SLIDER_CMD_RESET = 0x10,
-    SLIDER_CMD_GET_BOARD_INFO = 0xF0,
-} slider_cmd;
-
-static const uint8_t su8SliderVersion[32] = {
-    '1',  '5', '3', '3', '0', ' ',  ' ', ' ', 0xA0,
-
-    '0',  '6', '7', '1', '2', 0xFF,
-
-    0x90,
+static const slider_cmd_Tx_hw_info sSliderHwInfo = {
+    "15330   ", 0xA0, "06712", 0xFF, 0x90, 0, 0,
 };
 
 static inline void Slider_Write(uint8_t u8Byte) {
@@ -39,7 +34,7 @@ static inline void Slider_Write(uint8_t u8Byte) {
     }
     USB_VCOM_Write(u8Byte);
 }
-static void Slider_Respond(slider_cmd u8SliderCmd, const uint8_t* pu8Packet, uint8_t u8NPacket) {
+static void Slider_Respond(slider_cmd_Tx u8SliderCmd, const uint8_t* pu8Packet, uint8_t u8NPacket) {
     uint8_t u8Sum = SLIDER_SYNC + u8SliderCmd + u8NPacket;
     USB_VCOM_Write(SLIDER_SYNC);  // We don't want to escape sync!
     Slider_Write(u8SliderCmd);
@@ -52,45 +47,110 @@ static void Slider_Respond(slider_cmd u8SliderCmd, const uint8_t* pu8Packet, uin
 
     Slider_Write(-u8Sum);
 }
-static void Slider_Process(slider_cmd u8SliderCmd, uint8_t* pu8Packet, uint8_t u8NPacket) {
+static void Slider_Process(slider_cmd_Rx u8SliderCmd, uint8_t* pu8Packet, uint8_t u8NPacket) {
     switch (u8SliderCmd) {
-        case SLIDER_CMD_RESET:
-            // Hmm? Do we not need to <su8AutoEnabled = 0;> here?
-            Slider_Respond(SLIDER_CMD_RESET, NULL, 0);
+        case SLIDER_CMD_Rx_RESET:
+            // These three weren't present previously, but PSoC firmware suggests they should be
+            // TODO: Validate this against the game!
+            su8AutoEnabled = 0;
+            su8AutoEnabledRaw = 0;
+            su8AutoEnabledByte = 0;
+            // Real firmware can throw a bus exception, but we won't
+            Slider_Respond(SLIDER_CMD_Tx_RESET, NULL, 0);
             return;
-        case SLIDER_CMD_GET_BOARD_INFO:
-            Slider_Respond(SLIDER_CMD_GET_BOARD_INFO, su8SliderVersion, sizeof su8SliderVersion);
+        case SLIDER_CMD_Rx_HW_INFO:
+            Slider_Respond(SLIDER_CMD_Tx_HW_INFO, (void*)&sSliderHwInfo, sizeof sSliderHwInfo);
+            return;
+        case SLIDER_CMD_Rx_CPU_STATUS:
+            slider_cmd_Tx_cpu_status Status = {
+                {
+                    .bGlobalInterrupt = 1,
+                    .bWatchdogReset = 0,  // Report everything okay
+                    .bPowerOnReset = 0,   // Cleared in entry0
+                    .bSleep = 0,          // Obvious
+                    .bStop = 0,           // Obvious
+                },
+                {
+                    .bBootMultiple = 0,
+                    .bSlowImo = 0,
+                    .bEcoExistsWritten = 1,  // Set implicitly in entry0
+                    .bEcoExists = 1,         // Set in entry0
+                    .bSramWatchdog = 0,
+                },
+            };
+            Slider_Respond(SLIDER_CMD_Tx_CPU_STATUS, (void*)&Status, sizeof Status);
             return;
 
-        case SLIDER_CMD_SET_LED:
-            // TODO: What is the first byte of data? (00h and 28h observed)
-            // Why are there 32 triples?
-            if (u8NPacket == 1 + 0x60) {
+        case SLIDER_CMD_Rx_LED:
+        case SLIDER_CMD_Rx_REPORT_PING_PONG:
+        case SLIDER_CMD_Rx_RAW_PING_PONG:
+        case SLIDER_CMD_Rx_BRAW_PING_PONG:
+            // We have 32 triples here because Chunithm's slider is barely different from Project
+            // Diva's! We only care about the first 31 of them.
+            if (u8NPacket == sizeof(slider_cmd_Rx_led)) {
+                gu8GameBrightness = ((slider_cmd_Rx_led*)pu8Packet)->u8Brightness;
+
                 gbLedDataIsControlledExt = 1;
                 su32SinceLastControlled = 0;
-                memcpy(gu8aControlledExtLedData, &pu8Packet[1], 3 * 32);
+                memcpy(gu8aControlledExtLedData, &((slider_cmd_Rx_led*)pu8Packet)->aBRG, 3 * 32);
             }
-            su8GotLedData = 1;
-            // No response
+            // Reprocess this packet as a report request where applicable
+            if (u8SliderCmd == SLIDER_CMD_Rx_REPORT_PING_PONG) {
+                Slider_Process(SLIDER_CMD_Rx_REPORT, pu8Packet, u8NPacket);
+            } else if (u8SliderCmd == SLIDER_CMD_Rx_RAW_PING_PONG) {
+                Slider_Process(SLIDER_CMD_Rx_RAW, pu8Packet, u8NPacket);
+            } else if (u8SliderCmd == SLIDER_CMD_Rx_BRAW_PING_PONG) {
+                Slider_Process(SLIDER_CMD_Rx_BRAW, pu8Packet, u8NPacket);
+            }
             return;
 
-        case SLIDER_CMD_AUTO_START:
+        case SLIDER_CMD_Rx_REPORT:
+            Slider_Respond(SLIDER_CMD_Tx_REPORT, gu8GroundData, sizeof gu8GroundData);
+            return;
+        case SLIDER_CMD_Rx_RAW:
+            // TODO:
+            return;
+        case SLIDER_CMD_Rx_BRAW:
+            // TODO:
+            return;
+
+        case SLIDER_CMD_Rx_REPORT_ENABLE:
             su8AutoEnabled = 1;
-            su8GotLedData = 1;
             // No response
             return;
-        case SLIDER_CMD_AUTO_STOP:
+        case SLIDER_CMD_Rx_RAW_ENABLE:
+            su8AutoEnabledRaw = 1;
+            // No response
+            return;
+        case SLIDER_CMD_Rx_BRAW_ENABLE:
+            su8AutoEnabledByte = 1;
+            // No response
+            return;
+        case SLIDER_CMD_Rx_REPORT_DISABLE:
             // Purge any Tx buffer from the auto sending
-            if (su8AutoEnabled) USB_VCOM_PurgeTx();
+            if (su8AutoEnabled || su8AutoEnabledRaw || su8AutoEnabledByte) USB_VCOM_PurgeTx();
             su8AutoEnabled = 0;
-            Slider_Respond(SLIDER_CMD_AUTO_STOP, NULL, 0);
+            su8AutoEnabledRaw = 0;
+            su8AutoEnabledByte = 0;
+            Slider_Respond(SLIDER_CMD_Tx_REPORT_DISABLE, NULL, 0);
             return;
 
-        // This is an outbound-only command, so we should never see it here!
-        case SLIDER_CMD_AUTO:
-        default:
+        case SLIDER_CMD_Rx_BRAW_SET_OFFSET:
+            su16ByteRawSliderOffset = ((slider_cmd_Rx_braw_set_offset*)pu8Packet)->u16Offset;
+            Slider_Respond(SLIDER_CMD_Tx_BRAW_SET_OFFSET, NULL, 0);
+            return;
+        case SLIDER_CMD_Rx_BRAW_SET_SHIFT:
+            su8ByteRawSliderShift = ((slider_cmd_Rx_braw_set_shift*)pu8Packet)->u8Shift;
+            Slider_Respond(SLIDER_CMD_Tx_BRAW_SET_SHIFT, NULL, 0);
             return;
     }
+}
+void Slider_Exception(uint8_t u8SliderCmd, slider_exception u8Exc) {
+    slider_cmd_TxRx_exception Packet = {
+        u8SliderCmd,
+        u8Exc,
+    };
+    Slider_Respond(SLIDER_CMD_Tx_EXCEPTION, (void*)&Packet, sizeof Packet);
 }
 
 void Slider_TickSerial(void) {
@@ -117,12 +177,16 @@ void Slider_TickSerial(void) {
     while (USB_VCOM_Available()) {
         uint8_t u8Byte = USB_VCOM_Read();
         if (u8Byte == SLIDER_MARK) {
+            // Multiple marks in a row get folded down into a single mark
             u8Mark = 1;
             continue;
         } else if (u8Mark) {
             u8Mark = 0;
-            // TODO: If u8Byte is 0xFD we should technically give up here
-            u8Byte++;
+            // Only unescape if the byte was actually escaped
+            // A mark followed by any other byte is a no-op
+            if (u8Byte == SLIDER_MARKED_SYNC || u8Byte == SLIDER_MARKED_MARK) {
+                u8Byte++;
+            }
         }
 
         u8Sum += u8Byte;
@@ -151,7 +215,11 @@ void Slider_TickSerial(void) {
                 break;
             case SLIDER_PARSE_CHECKSUM:
                 // Only handle the packet if the sum equaled out
-                if (u8Sum == 0) Slider_Process(u8SliderCmd, u8Packet, u8NPacket);
+                if (u8Sum == 0) {
+                    Slider_Process(u8SliderCmd, u8Packet, u8NPacket);
+                } else {
+                    Slider_Exception(u8SliderCmd, SLIDER_EXCEPTION_CHECKSUM);
+                }
 
                 su8State = SLIDER_PARSE_SYNC_WAIT;
                 break;
@@ -172,6 +240,6 @@ void Slider_Tick1ms() {
 
         u8Counter = 0;
 
-        Slider_Respond(SLIDER_CMD_AUTO, gu8GroundData, sizeof gu8GroundData);
+        Slider_Respond(SLIDER_CMD_Tx_REPORT, gu8GroundData, sizeof gu8GroundData);
     }
 }

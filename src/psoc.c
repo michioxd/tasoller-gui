@@ -177,8 +177,6 @@ uint16_t PSoC_GetFingerCapacitance(void) {
     PSoC_Cmd(PSoC_CMD_TX_GET_FINGER_CAP, 0, 0, 1);
 
     return u16FingerCap;
-    // Swap endian
-    // return (u16FingerCap >> 8) | ((u16FingerCap & 0xff) << 8);
 }
 void PSoC_GetDebug(PSoC_CMD_DEBUG u8Cmd, uint8_t* pu8Data, volatile uint8_t* pu8Ready) {
     pu8PsocGotData = pu8Ready;
@@ -201,11 +199,6 @@ void PSoC_EnableDebug(uint8_t u8D1, uint8_t u8D2) {
 
 uint8_t gu8GroundData[32];
 
-// These are used to uniformly narrow the min/max gap
-// #define SCALE_OFFSET_MIN 150
-// #define SCALE_OFFSET_MIN 100
-// #define SCALE_OFFSET_MAX 450
-
 void PSoC_PostProcessing(void) {
     // Process the raw PSoC data to compute our external 0-255 values
     for (uint8_t i = 0; i < 32; i++) {
@@ -213,8 +206,8 @@ void PSoC_PostProcessing(void) {
 
         const uint16_t u16Pad = gu16PSoCDiff[i];
 
-        const uint16_t u16Min = gConfig.u16PSoCScaleMin[i];  // + SCALE_OFFSET_MIN;
-        const uint16_t u16Max = gConfig.u16PSoCScaleMax[i];  // - SCALE_OFFSET_MAX;
+        const uint16_t u16Min = gConfig.u16PSoCScaleMin[i];
+        const uint16_t u16Max = gConfig.u16PSoCScaleMax[i];
 
         if (u16Pad < u16Min) {
             gu8GroundData[j] = 0;

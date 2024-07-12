@@ -110,96 +110,96 @@ enum {
 #define GET_LINE_CODING 0x21
 #define SET_CONTROL_LINE_STATE 0x22
 
-typedef struct __attribute__((packed)) {
+typedef struct __packed {
     uint8_t bmRequestType;
     uint8_t bRequest;
     union {
         uint8_t wBytes[6];
-        struct __attribute__((packed)) {
+        struct __packed {
             uint16_t wValue;
             uint16_t wIndex;
             uint16_t wLength;
         };
 
         // Core setup packet types
-        struct __attribute__((packed)) {
+        struct __packed {
             uint8_t bIndex;
             uint8_t bType;
             uint16_t wLanguageId;
             uint16_t wDescriptorLength;
         } getDescriptor;
-        struct __attribute__((packed)) {
+        struct __packed {
             uint16_t wFeature;
             uint16_t wEp;
         } clearFeature;
-        struct __attribute__((packed)) {
+        struct __packed {
             uint16_t wAddress;
         } setAddress;
-        struct __attribute__((packed)) {
+        struct __packed {
             uint16_t wConfiguration;
         } setConfiguration;
-        struct __attribute__((packed)) {
+        struct __packed {
             uint16_t wFeature;
             uint16_t wEp;
         } setFeature;
-        struct __attribute__((packed)) {
+        struct __packed {
             uint16_t wAlternate;
             uint16_t wInterface;
         } setInterface;
-        struct __attribute__((packed)) {
+        struct __packed {
             uint16_t wValue;
             uint16_t wInterface;
         } getStatus;
 
         // USB HID
-        struct __attribute__((packed)) {
+        struct __packed {
             uint8_t bIndex;
             uint8_t bType;
             uint16_t wInterfaceNum;
             uint16_t wDescriptorLength;
         } hidGetDescriptor;
-        struct __attribute__((packed)) {
+        struct __packed {
             uint8_t bReportId;
             uint8_t bReportType;
             uint16_t wInterface;
             uint16_t wLength;
         } hidGetReport;
-        struct __attribute__((packed)) {
+        struct __packed {
             uint8_t bReportId;
             uint8_t bReportType;
             uint16_t wInterface;
             uint16_t wLength;
         } hidSetReport;
-        struct __attribute__((packed)) {
+        struct __packed {
             uint8_t bReportId;
             uint8_t bPad;
             uint16_t wInterface;
             uint16_t wLength;
         } hidGetIdle;
-        struct __attribute__((packed)) {
+        struct __packed {
             uint8_t bReportId;
             uint8_t bDuration;
             uint16_t wInterface;
             uint16_t wLength;
         } hidSetIdle;
-        struct __attribute__((packed)) {
+        struct __packed {
             uint16_t wPad;
             uint16_t wInterface;
             uint16_t wLength;
         } hidGetProtocol;
-        struct __attribute__((packed)) {
+        struct __packed {
             uint16_t wProtocol;
             uint16_t wInterface;
             uint16_t wLength;
         } hidSetProtocol;
 
         // USB CDC
-        struct __attribute__((packed)) {
+        struct __packed {
             uint16_t wValue;
             uint16_t wInterface;
             uint16_t wLength;
         } getLineCoding;
-        struct __attribute__((packed)) {
+        struct __packed {
             uint16_t wValue;
             uint16_t wInterface;
             uint16_t wLength;
@@ -207,7 +207,7 @@ typedef struct __attribute__((packed)) {
     };
 } usb_setup_t;
 
-typedef struct __attribute__((packed)) {
+typedef struct __packed {
     uint8_t bLength;
     uint8_t bDescriptorType;
     uint16_t bcdUSB;
@@ -223,7 +223,7 @@ typedef struct __attribute__((packed)) {
     uint8_t iSerialNumber;
     uint8_t bNumConfigurations;
 } usb_device_descr_t;
-typedef struct __attribute__((packed)) {
+typedef struct __packed {
     uint8_t bLength;
     uint8_t bDescriptorType;
     uint8_t bFirstInterface;
@@ -233,7 +233,7 @@ typedef struct __attribute__((packed)) {
     uint8_t bFunctionProtocol;
     uint8_t iFunction;
 } usb_desc_iad_t;
-typedef struct __attribute__((packed)) {
+typedef struct __packed {
     uint8_t bLength;
     uint8_t bDescriptorType;
     uint16_t wTotalLength;
@@ -243,7 +243,7 @@ typedef struct __attribute__((packed)) {
     uint8_t bmAttributes;
     uint8_t MaxPower;
 } usb_desc_config_t;
-typedef struct __attribute__((packed)) {
+typedef struct __packed {
     uint8_t bLength;
     uint8_t bDescriptorType;
     uint8_t bInterfaceNumber;
@@ -254,7 +254,7 @@ typedef struct __attribute__((packed)) {
     uint8_t bInterfaceProtocol;
     uint8_t iInterface;
 } usb_desc_interface_t;
-typedef struct __attribute__((packed)) {
+typedef struct __packed {
     uint8_t bLength;
     uint8_t bDescriptorType;
     uint16_t bcdHID;
@@ -263,7 +263,7 @@ typedef struct __attribute__((packed)) {
     uint8_t bReportDescriptorType;
     uint16_t wDescriptorLength;
 } usb_desc_hid_t;
-typedef struct __attribute__((packed)) {
+typedef struct __packed {
     uint8_t bLength;
     uint8_t bDescriptorType;
     uint8_t bEndpointAddress;
@@ -272,27 +272,27 @@ typedef struct __attribute__((packed)) {
     uint8_t bInterval;
 } usb_desc_endpoint_t;
 
-typedef struct __attribute__((packed)) {
+typedef struct __packed {
     uint8_t bLength;
     uint8_t bDescriptorType;
     uint8_t bDescriptorSubtype;
     uint16_t bcdCDC;
 } usb_desc_cdc_header_t;
-typedef struct __attribute__((packed)) {
+typedef struct __packed {
     uint8_t bLength;
     uint8_t bDescriptorType;
     uint8_t bDescriptorSubtype;
     uint8_t bControlInterface;
     uint8_t bSubordinateInterface0;
 } usb_desc_cdc_union_t;
-typedef struct __attribute__((packed)) {
+typedef struct __packed {
     uint8_t bLength;
     uint8_t bDescriptorType;
     uint8_t bDescriptorSubtype;
     uint8_t bmCapabilities;
     uint8_t bDataInterface;
 } usb_desc_cdc_call_t;
-typedef struct __attribute__((packed)) {
+typedef struct __packed {
     uint8_t bLength;
     uint8_t bDescriptorType;
     uint8_t bDescriptorSubtype;

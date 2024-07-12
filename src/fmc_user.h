@@ -33,7 +33,7 @@ typedef struct __attribute__((aligned(4), packed)) {
 
     // Flags
     union {
-        struct __attribute__((packed)) {
+        struct __packed {
             uint8_t bEnableIO4 : 1;
             uint8_t bEnableKeyboard : 1;
             uint8_t bEnableRainbow : 1;

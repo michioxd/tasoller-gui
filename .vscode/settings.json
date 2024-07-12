@@ -1,10 +1,12 @@
 {
   "clangd.arguments": ["--query-driver=*arm-none-eabi-*"],
   "clangd.fallbackFlags": [
-    "-IC:/Program Files (x86)/GNU Arm Embedded Toolchain/13.2 Rel1/arm-none-eabi/include",
+    "-IC:/Program Files (x86)/Arm GNU Toolchain arm-none-eabi/13.2 Rel1/arm-none-eabi/include",
+    "-IC:/Program Files (x86)/Arm GNU Toolchain arm-none-eabi/13.2 Rel1/lib/gcc/arm-none-eabi/13.2.1/include",
     "-I${workspaceFolder}/NUC123/inc",
     "-I${workspaceFolder}/NUC123/StdDriver/inc",
     "-D__GNUC__",
+    "-D__XSTRING(x)=",  // Workaround for string.h
     "-Wno-pointer-to-int-cast",
     "-Wno-int-to-pointer-cast",
   ],

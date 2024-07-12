@@ -74,6 +74,7 @@ int _entry(void) {
     SYS_Bootloader_Check();
 #endif
     SYS_ModuleInit();
+    // TODO: Re-lock registers, ideally. Need to check which registers we use where
 
     FMC_EEPROM_Load();
 

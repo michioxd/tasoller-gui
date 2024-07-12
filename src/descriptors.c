@@ -249,7 +249,7 @@ usb_device_descr_t gIO4DeviceDescriptor = {
 };
 
 // We have a unified descriptor that covers
-typedef struct __attribute__((packed)) {
+typedef struct __packed {
     const usb_desc_config_t Config;
 
     const usb_desc_iad_t CDC_IAD;

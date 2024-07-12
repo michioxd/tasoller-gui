@@ -24,4 +24,4 @@ The `NUC123` folder is a heavily reduced form of the complete BSP provided by Nu
 
 `NUC123.ld` is a modified version of the GCC linker script provided by Nuvoton, and may require modification.
 
-To pull in additional BSP library modules, if required, the `Makefile` should be modified.
+To pull in additional BSP drivers, if required, the `Makefile` should be modified.

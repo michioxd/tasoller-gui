@@ -2,9 +2,15 @@
   "configurations": [
     {
       "name": "GCC",
-      "includePath": ["C:/Program Files (x86)/Arm GNU Toolchain arm-none-eabi/13.2 Rel1/arm-none-eabi/include", "NUC123/inc", "NUC123/StdDriver/inc"],
+      "includePath": [
+        "C:/Program Files (x86)/Arm GNU Toolchain arm-none-eabi/13.2 Rel1/arm-none-eabi/include",
+        "C:/Program Files (x86)/Arm GNU Toolchain arm-none-eabi/13.2 Rel1/lib/gcc/arm-none-eabi/13.2.1/include",
+        "NUC123/inc",
+        "NUC123/StdDriver/inc"
+      ],
       "defines": [],
-      "intelliSenseMode": "gcc-arm"
+      "intelliSenseMode": "gcc-arm",
+      "compilerPath": "C:/Program Files (x86)/Arm GNU Toolchain arm-none-eabi/13.2 Rel1/bin/arm-none-eabi-gcc.exe"
     }
   ],
   "version": 4

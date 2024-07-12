@@ -85,7 +85,6 @@ void USBD_IRQHandler(void) {
         }
         if (u32IntSts & USBD_INTSTS_CDC_CMD) {
             USBD_CLR_INT_FLAG(USBD_INTSTS_CDC_CMD);
-            // TODO: ACM packets have connect/disconnect?
         }
 
         // IO4 HID endpoints
