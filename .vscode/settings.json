@@ -6,13 +6,70 @@
     "-I${workspaceFolder}/NUC123/inc",
     "-I${workspaceFolder}/NUC123/StdDriver/inc",
     "-D__GNUC__",
-    "-D__XSTRING(x)=",  // Workaround for string.h
+    "-D__XSTRING(x)=", // Workaround for string.h
     "-Wno-pointer-to-int-cast",
-    "-Wno-int-to-pointer-cast",
+    "-Wno-int-to-pointer-cast"
   ],
-  "cortex-debug.variableUseNaturalFormat": true,
+  "cortex-debug.variableUseNaturalFormat": false,
   "cortex-debug.liveWatchRefreshRate": 1000,
   "cortex-debug.enableTelemetry": false,
   "files.trimFinalNewlines": true,
   "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
+
+  "better-comments.tags": [
+    {
+      "tag": "===",
+      "color": "#00F5FF",
+      "strikethrough": false,
+      "underline": false,
+      "backgroundColor": "#00F5FF11",
+      "bold": false,
+      "italic": false
+    },
+    {
+      "tag": "!",
+      "color": "#FF2D00",
+      "strikethrough": false,
+      "underline": false,
+      "backgroundColor": "transparent",
+      "bold": false,
+      "italic": false
+    },
+    {
+      "tag": "?",
+      "color": "#3498DB",
+      "strikethrough": false,
+      "underline": false,
+      "backgroundColor": "transparent",
+      "bold": false,
+      "italic": false
+    },
+    {
+      "tag": "//",
+      "color": "#474747",
+      "strikethrough": true,
+      "underline": false,
+      "backgroundColor": "transparent",
+      "bold": false,
+      "italic": false
+    },
+    {
+      "tag": "todo",
+      "color": "#FF8C00",
+      "strikethrough": false,
+      "underline": false,
+      "backgroundColor": "transparent",
+      "bold": false,
+      "italic": false
+    },
+    {
+      "tag": "*",
+      "color": "#98C379",
+      "strikethrough": false,
+      "underline": false,
+      "backgroundColor": "transparent",
+      "bold": false,
+      "italic": false
+    }
+  ]
 }

@@ -2,6 +2,7 @@
     "recommendations": [
         "aaron-bond.better-comments",
         "marus25.cortex-debug",
-        "llvm-vs-code-extensions.vscode-clangd"
+        "llvm-vs-code-extensions.vscode-clangd",
+        "aaron-bond.better-comments"
     ]
 }

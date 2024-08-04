@@ -1,144 +1,189 @@
 #include "tasoller.h"
 
-#define HID_IO4_BUF ((uint8_t *)(USBD_BUF_BASE + USBD_GET_EP_BUF_ADDR(EP_HID_IO4_IN)))
-#define HID_MISC_BUF ((uint8_t *)(USBD_BUF_BASE + USBD_GET_EP_BUF_ADDR(EP_HID_MISC_IN)))
+uint16_t u16RequestedConsumerControl = 0;
+uint32_t u32EnterPressStarted = 0xFFFFFFFF;
 
-static const uint8_t u8GroundThreshold = 20;
+#define ENTER_HOLD_TIME 5000  // 5 seconds
+
+#define HID_MISC_BUF ((uint8_t *)(USBD_BUF_BASE + USBD_GET_EP_BUF_ADDR(EP_HID_MISC_IN)))
+#define HID_IO4_BUF ((uint8_t *)(USBD_BUF_BASE + USBD_GET_EP_BUF_ADDR(EP_HID_IO4_IN)))
+
+#define HID_MISC_SEND(buf)                                   \
+    do {                                                     \
+        USBD_SET_PAYLOAD_LEN(EP_HID_MISC_IN, sizeof *(buf)); \
+        gu8HIDMiscReady = 0;                                 \
+    } while (0)
+
 static const uint8_t u8GroundKeymap[32] = {
-    KEY_I, KEY_COMMA,  //
-    KEY_8, KEY_K,      //
-    KEY_U, KEY_M,      //
-    KEY_7, KEY_J,      //
-    KEY_Y, KEY_N,      //
-    KEY_6, KEY_H,      //
-    KEY_T, KEY_B,      //
-    KEY_5, KEY_G,      //
-    KEY_R, KEY_V,      //
-    KEY_4, KEY_F,      //
-    KEY_E, KEY_C,      //
-    KEY_3, KEY_D,      //
-    KEY_W, KEY_X,      //
-    KEY_2, KEY_S,      //
-    KEY_Q, KEY_Z,      //
-    KEY_1, KEY_A,      //
+    KEY_I, KEY_9,  // Dao uses: KEY_I, KEY_COMMA
+    KEY_8, KEY_K,  //
+    KEY_U, KEY_M,  //
+    KEY_7, KEY_J,  //
+    KEY_Y, KEY_N,  //
+    KEY_6, KEY_H,  //
+    KEY_T, KEY_B,  //
+    KEY_5, KEY_G,  //
+    KEY_R, KEY_V,  //
+    KEY_4, KEY_F,  //
+    KEY_E, KEY_C,  //
+    KEY_3, KEY_D,  //
+    KEY_W, KEY_X,  //
+    KEY_2, KEY_S,  //
+    KEY_Q, KEY_Z,  //
+    KEY_1, KEY_A,  //
 };
 static const uint8_t u8AirKeymap[6] = {
-    HID_KEYBOARD_SLASH_AND_QUESTION_MARK,              // VK_OEM_2
-    HID_KEYBOARD_PERIOD_AND_GREATER_THAN,              // VK_OEM_PERIOD
-    HID_KEYBOARD_QUOTE_AND_DOUBLEQUOTE,                // VK_OEM_7
-    HID_KEYBOARD_SEMICOLON_AND_COLON,                  // VK_OEM_1
-    HID_KEYBOARD_RIGHT_BRACKET_AND_RIGHT_CURLY_BRACE,  // VK_OEM_6
-    HID_KEYBOARD_LEFT_BRACKET_AND_LEFT_CURLY_BRACE,    // VK_OEM_4
+    // Dao mapping:
+    // HID_KEYBOARD_SLASH_AND_QUESTION_MARK,              // VK_OEM_2
+    // HID_KEYBOARD_PERIOD_AND_GREATER_THAN,              // VK_OEM_PERIOD
+    // HID_KEYBOARD_QUOTE_AND_DOUBLEQUOTE,                // VK_OEM_7
+    // HID_KEYBOARD_SEMICOLON_AND_COLON,                  // VK_OEM_1
+    // HID_KEYBOARD_RIGHT_BRACKET_AND_RIGHT_CURLY_BRACE,  // VK_OEM_6
+    // HID_KEYBOARD_LEFT_BRACKET_AND_LEFT_CURLY_BRACE,    // VK_OEM_4
+
+    // UMIGURI mapping:
+    KEY_0, KEY_O, KEY_L, KEY_P, KEY_COMMA, KEY_PERIOD,
 };
-static inline void _HID_Keyboard_Tick(uint8_t bReal) {
-    hid_report_t *buf = (hid_report_t *)HID_MISC_BUF;
+
+static uint8_t _HID_Keyboard_Tick(uint8_t bReleaseAll) {
+    hid_kbd_report_t *buf = (hid_kbd_report_t *)HID_MISC_BUF;
+
+    // Send a report of zeroes to release all keys
+    if (bReleaseAll) {
+        memset(buf, 0, sizeof *buf);
+        buf->bReportId = HID_REPORT_ID_KEYBOARD;
+
+        HID_MISC_SEND(buf);
+        return 1;
+    }
+
+    static uint8_t u8LastButtons = 0;
+    static uint32_t u32LastSlider = 0;
+
+    // If nothing changed, do nothing
+    if (gu8DigitalButtons == u8LastButtons && gu32PSoCDigital == u32LastSlider) {
+        return 0;
+    }
 
     memset(buf, 0, sizeof *buf);
     buf->bReportId = HID_REPORT_ID_KEYBOARD;
     uint8_t kI = 0;
 
-    if (bReal) {
-        if (gu8DigitalButtons & 0x01) buf->bKeyboard[kI++] = HID_KEYBOARD_F1;
-        if (gu8DigitalButtons & 0x02) buf->bKeyboard[kI++] = HID_KEYBOARD_F2;
-        if (gu8DigitalButtons & 0x04) buf->bKeyboard[kI++] = u8AirKeymap[0];
-        if (gu8DigitalButtons & 0x08) buf->bKeyboard[kI++] = u8AirKeymap[1];
-        if (gu8DigitalButtons & 0x10) buf->bKeyboard[kI++] = u8AirKeymap[2];
-        if (gu8DigitalButtons & 0x20) buf->bKeyboard[kI++] = u8AirKeymap[3];
-        if (gu8DigitalButtons & 0x40) buf->bKeyboard[kI++] = u8AirKeymap[4];
-        if (gu8DigitalButtons & 0x80) buf->bKeyboard[kI++] = u8AirKeymap[5];
+    if (gu8DigitalButtons & DIGITAL_FN2_Msk) buf->bKeyboard[kI++] = HID_KEYBOARD_F1;
+    if (gu8DigitalButtons & DIGITAL_FN1_Msk) buf->bKeyboard[kI++] = HID_KEYBOARD_F2;
+    if (gu8DigitalButtons & 0x04) buf->bKeyboard[kI++] = u8AirKeymap[0];
+    if (gu8DigitalButtons & 0x08) buf->bKeyboard[kI++] = u8AirKeymap[1];
+    if (gu8DigitalButtons & 0x10) buf->bKeyboard[kI++] = u8AirKeymap[2];
+    if (gu8DigitalButtons & 0x20) buf->bKeyboard[kI++] = u8AirKeymap[3];
+    if (gu8DigitalButtons & 0x40) buf->bKeyboard[kI++] = u8AirKeymap[4];
+    if (gu8DigitalButtons & 0x80) buf->bKeyboard[kI++] = u8AirKeymap[5];
 
-        for (int i = 0; i < 32; i++) {
-            if (gu8GroundData[i] > u8GroundThreshold) buf->bKeyboard[kI++] = u8GroundKeymap[i];
-        }
+    for (int i = 0; i < 32; i++) {
+        if (gu32PSoCDigital & (1 << i)) buf->bKeyboard[kI++] = u8GroundKeymap[i];
     }
 
-    USBD_SET_PAYLOAD_LEN(EP_HID_MISC_IN, sizeof *buf);
+    HID_MISC_SEND(buf);
+    u8LastButtons = gu8DigitalButtons;
+    u32LastSlider = gu32PSoCDigital;
+    return 1;
 }
+static uint8_t _HID_Consumer_Tick(void) {
+    static uint16_t u16Last = 0;
+    if (u16Last == u16RequestedConsumerControl) return 0;
+    u16Last = u16RequestedConsumerControl;
 
-#define IO4_BUTTON_TEST (1 << 9)
-#define IO4_BUTTON_SERVICE (1 << 6)
-
-#define IO4_CMD_SET_COMM_TIMEOUT 0x01
-#define IO4_CMD_SET_SAMPLING_COUNT 0x02
-#define IO4_CMD_CLEAR_BOARD_STATUS 0x03
-#define IO4_CMD_SET_GENERAL_OUTPUT 0x04
-#define IO4_CMD_SET_PWM_OUTPUT 0x05
-#define IO4_CMD_SET_UNIQUE_OUTPUT 0x41
-#define IO4_CMD_UPDATE_FIRMWARE 0x85
-
-volatile uint8_t u8IO4SystemStatus = 0;
-volatile uint8_t u8IO4USBStatus = 0;
-volatile uint16_t u16IO4CommTimeout = 0;
-volatile uint8_t u8IO4SamplingCount = 0;
-
-static void _HID_IO4_Prepare(volatile uint8_t *pu8EpBuf) {
-    io4_hid_in_t *buf = (io4_hid_in_t *)pu8EpBuf;
+    hid_consumer_report_t *buf = (hid_consumer_report_t *)HID_MISC_BUF;
 
     memset(buf, 0, sizeof *buf);
-    buf->bReportId = HID_REPORT_ID_IO4;
-
-    // System buttons
-    if (gu8DigitalButtons & 0x01) buf->wButtons[0] |= IO4_BUTTON_TEST;
-    if (gu8DigitalButtons & 0x02) buf->wButtons[0] |= IO4_BUTTON_SERVICE;
-    // Airs
-    if (!(gu8DigitalButtons & 0x04)) buf->wButtons[0] |= 1 << 13;
-    if (!(gu8DigitalButtons & 0x08)) buf->wButtons[1] |= 1 << 13;
-    if (!(gu8DigitalButtons & 0x10)) buf->wButtons[0] |= 1 << 12;
-    if (!(gu8DigitalButtons & 0x20)) buf->wButtons[1] |= 1 << 12;
-    if (!(gu8DigitalButtons & 0x40)) buf->wButtons[0] |= 1 << 11;
-    if (!(gu8DigitalButtons & 0x80)) buf->wButtons[1] |= 1 << 11;
-
-    buf->bUsbStatus = u8IO4USBStatus;
-    buf->bSystemStatus = u8IO4SystemStatus;
+    buf->bReportId = HID_REPORT_ID_CONSUMER_CONTROL;
+    buf->u16Control[0] = u16RequestedConsumerControl;
+    HID_MISC_SEND(buf);
+    return 1;
 }
-static void _HID_IO4_Tick() {
-    _HID_IO4_Prepare(HID_IO4_BUF);
 
-    // We must send data every 8ms! None of that "only sending changed keys" stuff
-    // Trigger a write
-    gu8HIDIO4Ready = 0;
-    USBD_SET_PAYLOAD_LEN(EP_HID_IO4_IN, sizeof(io4_hid_in_t));
-}
-static void _HID_Debug_Tick() {
-    debug_hid_report_t *buf = (debug_hid_report_t *)HID_MISC_BUF;
-    memset(buf, 0, sizeof *buf);
+static uint8_t _HID_Enter_Tick(void) {
+    // TODO: This isn't working, so we're using su8LastState for now instead
+    if (u32EnterPressStarted == 0xFFFFFFFF) return 0;
 
-    static uint8_t bWhich = 0;
-    if ((bWhich++) & 1) {
-        buf->bReportId = HID_REPORT_ID_DEBUG_A;
-        for (uint8_t i = 0; i < 32; i += 2) buf->wData[i / 2] = gu8GroundData[i];
+    static uint8_t su8LastState = 0;
+    uint8_t u8State = 0;
+
+    // There's an _incredibly_ small chance the user tapped the cell at exactly the ms (49 days in!)
+    // when the timer wrapped round to 0. This is too stupid to account for.
+    if (u32EnterPressStarted && (MS_SINCE(u32EnterPressStarted) < ENTER_HOLD_TIME)) {
+        u8State = 1;
     } else {
-        buf->bReportId = HID_REPORT_ID_DEBUG_B;
-        for (uint8_t i = 1; i < 32; i += 2) buf->wData[i / 2] = gu8GroundData[i];
+        u8State = 0;
+        u32EnterPressStarted = 0xFFFFFFFF;
     }
-    USBD_SET_PAYLOAD_LEN(EP_HID_MISC_IN, sizeof *buf);
+
+    if (u8State == su8LastState) return 0;
+    su8LastState = u8State;
+
+    hid_enter_report_t *buf = (hid_enter_report_t *)HID_MISC_BUF;
+    memset(buf, 0, sizeof *buf);
+    buf->bReportId = HID_REPORT_ID_ENTER;
+    if (u8State) buf->u8Keyboard[0] = KEY_ENTER;
+
+    HID_MISC_SEND(buf);
+    return 1;
 }
 
-static void _HID_Misc_Tick() {
+typedef enum {
+    TIMESLOT_KEYBOARD = 0,
+    TIMESLOT_CONSUMER,
+    TIMESLOT_ENTER,
+    _TIMESLOT_COUNT,
+} eTimeslot_t;
+static void _HID_Misc_Tick(void) {
     static uint8_t sbLastEnableKeyboard = 0;
-    if (gConfig.bEnableKeyboard) {
-        sbLastEnableKeyboard = 1;
-        _HID_Keyboard_Tick(1);
-    } else if (sbLastEnableKeyboard) {
-        // If we've just disabled the keyboard, make sure to send a packet with all keys released!
-        sbLastEnableKeyboard = 0;
-        _HID_Keyboard_Tick(0);
-    }
-    // TODO: gbEnableDebug (we'll need to use a toggle to alternate)
 
-    gu8HIDMiscReady = 0;
+    // We have multiple things we're going to be sending over this HID endpoint, so we timeshare
+    // which reports are sent. If a particular report has nothing to report in its slot, the next
+    // report gets a chance instead.
+    static eTimeslot_t eTimeslot = 0;
+
+    uint8_t u8Tries = _TIMESLOT_COUNT;
+    while (u8Tries--) {
+        switch (eTimeslot++) {
+            case TIMESLOT_KEYBOARD:
+                if (gConfig.bEnableKeyboard) {
+                    sbLastEnableKeyboard = 1;
+                    if (_HID_Keyboard_Tick(0)) goto timeslot_used;
+                } else if (sbLastEnableKeyboard) {
+                    // If we've just disabled the keyboard, make sure to send a packet with all keys
+                    // released!
+                    sbLastEnableKeyboard = 0;
+                    if (_HID_Keyboard_Tick(1)) goto timeslot_used;
+                }
+                break;
+
+            case TIMESLOT_CONSUMER:
+                if (_HID_Consumer_Tick()) goto timeslot_used;
+                break;
+
+            case TIMESLOT_ENTER:
+                if (_HID_Enter_Tick()) goto timeslot_used;
+                break;
+
+            default:
+                break;
+        }
+        if (eTimeslot > _TIMESLOT_COUNT) eTimeslot = 0;
+    }
+timeslot_used:;
+    ;
 }
 
-void USBD_HID_PrepareReport() {
-    if (gu8HIDIO4Ready) _HID_IO4_Tick();
+void USBD_HID_PrepareReport(void) {
+    if (gu8HIDIO4Ready) IO4_HID_Tick();
     if (gu8HIDMiscReady) _HID_Misc_Tick();
 }
 static uint8_t sIO4InBuffer[sizeof(io4_hid_in_t)] = { 0 };
 uint8_t *USBD_HID_GetReport(uint8_t u8ReportId, uint32_t *pu32Size) {
     switch (u8ReportId) {
         case HID_REPORT_ID_IO4:
-            if (!gConfig.bEnableIO4) return NULL;
-            _HID_IO4_Prepare(sIO4InBuffer);
+            IO4_HID_Prepare(sIO4InBuffer);
             *pu32Size = sizeof sIO4InBuffer;
             return sIO4InBuffer;
         default:
@@ -148,51 +193,7 @@ uint8_t *USBD_HID_GetReport(uint8_t u8ReportId, uint32_t *pu32Size) {
 void USBD_HID_SetReport(volatile uint8_t *pu8EpBuf, uint32_t u32Size) {
     // TODO: is pu8EpBuf[0] the report ID?
     // We need to switch on that report ID so we know what we're doing!
-    if (!gConfig.bEnableIO4) return;
 
     if (u32Size < 2) return;
-    switch (pu8EpBuf[1]) {
-        case IO4_CMD_SET_COMM_TIMEOUT:
-            if (u32Size >= 2 + 1) {
-                u16IO4CommTimeout = (uint16_t)pu8EpBuf[2] * 200;
-                u8IO4SystemStatus |= 0x10;
-
-                gu8HIDIO4Ready = 1;
-                _HID_IO4_Tick();
-            }
-            break;
-        case IO4_CMD_SET_SAMPLING_COUNT:
-            if (u32Size >= 2 + 1) {
-                u8IO4SamplingCount = pu8EpBuf[2];
-                u8IO4SystemStatus |= 0x20;
-
-                gu8HIDIO4Ready = 1;
-                _HID_IO4_Tick();
-            }
-            break;
-        case IO4_CMD_CLEAR_BOARD_STATUS:
-            u8IO4SystemStatus &= 0x0F;
-            u8IO4USBStatus &= 0x04;
-
-            gu8HIDIO4Ready = 1;
-            _HID_IO4_Tick();
-            break;
-        case IO4_CMD_SET_GENERAL_OUTPUT:
-            if (u32Size >= 2 + 3) {
-                // 20 bits of data for GPO (+4 of padding)
-            }
-            break;
-        case IO4_CMD_SET_PWM_OUTPUT:
-            if (u32Size >= 2 + 0) {
-                // 0 bytes of data for PWM duty cycles (IO4 has no PWM!)
-            }
-            break;
-        case IO4_CMD_SET_UNIQUE_OUTPUT:
-            if (u32Size >= 2 + 62) {
-                // 62 bytes of unique output data
-            }
-            break;
-        case IO4_CMD_UPDATE_FIRMWARE:
-            break;
-    }
+    IO4_Control(pu8EpBuf[1], u32Size - 2, &pu8EpBuf[2]);
 }

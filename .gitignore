@@ -5,3 +5,6 @@ picolibc/*
 # Build artifacts
 obj/*
 host_aprom.bin
+
+# Flashing tool
+flashtool/*

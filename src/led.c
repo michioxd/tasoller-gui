@@ -1,61 +1,137 @@
 #include "tasoller.h"
 
-hsv_t gaControlledIntLedData[LED_NUM_GROUND] = { 0 };
+hsv_t gaControlledIntLedData[LED_NUM_GROUND_LOGICAL] = { 0 };
 uint8_t gbLedDataIsControlledInt = 0;
-uint8_t gu8aControlledExtLedData[32 * 3];
+rgb_t gaControlledExtLedData[32];
 uint8_t gbLedDataIsControlledExt = 0;
+uint8_t gbLedIsCustom = 0;
 
-volatile uint8_t gu8LEDTx[LED_Tx_BUFFER];
-static void (*s_I2C1HandlerFn)(uint32_t u32Status) = NULL;
+volatile uint8_t gu8LEDTx[LED_PACKET_MAX_SIZE];
 
-volatile static uint8_t su8LedTxDataLock = 0;
+typedef enum : uint8_t {
+    I2C_SLAVE_TX_REPEAT_START_STOP = 0xA0,
+    I2C_SLAVE_TX_ADDR_ACK = 0xA8,
+    I2C_SLAVE_TX_ARBITRATION_LOST = 0xB0,
+    I2C_SLAVE_TX_DATA_ACK = 0xB8,
+    I2C_SLAVE_TX_DATA_NACK = 0xC0,
+    I2C_SLAVE_TX_LAST_DATA_ACK = 0xC8,
+    I2C_SLAVE_RX_ADDR_ACK = 0x60,
+    I2C_SLAVE_RX_ARBITRATION_LOST = 0x68,
+    I2C_SLAVE_RX_DATA_ACK = 0x80,
+    I2C_SLAVE_RX_DATA_NACK = 0x88,
+} I2C_Status_Slave;
 
-// Helper definitions
-#define SLAVE_RX_ADDR_ACK 0x60
-#define SLAVE_RX_ACK 0x80
-#define I2C_SLAVE_RX_NACK 0x88
-#define I2C_SLAVE_TX_REPEAT_START_STOP 0xA0
-#define SLAVE_TX_ACK 0xA8
-#define I2C_SLAVE_TX_NACK 0xC0
+volatile uint8_t* gpu8I2CRx = NULL;
+volatile uint16_t u16I2CRxIndex = 0;
+void I2C1_SlaveTx(I2C_Status_Slave eStatus) {
+    if (!eStatus) {
+        // Something went very wrong; restart the I2C controller
+        I2C_Close(I2C1);
+        LED_I2C1_Init();
+        return;
+    }
 
+    static uint8_t u8Cmd = 0;
+    static uint16_t su16I2CReadAddr = 0;
+
+    /**
+     * Bulk data receive request:
+     * (B0)Rx: START+SLA+W
+     * (B1)Tx: ACK
+     * (B2)Rx: [u8Cmd]
+     * (B3)Tx: ACK
+     * (B4)Rx: (Repeat START)+SLA+R
+     * (B5)Tx: ACK
+     * (B6)Rx: ACK
+     * (B7)Tx: [u8Data[i]]  |
+     * (B8)Rx: ACK          | Looped until Rx:NACK
+     *     Rx: STOP
+     *
+     * Single data receive request:
+     * (S0)Rx: START+SLA+W
+     * (S1)Tx: ACK
+     * (S2)Rx: [u8Cmd]
+     * (S3)Tx: ACK
+     *     Rx: STOP
+     * ---
+     * (S4)Rx: START+SLA+R
+     * (S5)Tx: ACK
+     */
+    switch (eStatus) {
+        // === Receive address and command ===
+        case I2C_SLAVE_RX_ADDR_ACK:                      // (B0,S0)
+            I2C_SET_CONTROL_REG(I2C1, I2C_I2CON_SI_AA);  // (B1,S1)
+            break;
+        case I2C_SLAVE_RX_DATA_ACK:  // (B2,S2)
+            uint8_t u8Data = I2C_GET_DATA(I2C1);
+            if (u16I2CRxIndex == 0) {
+                u8Cmd = u8Data;
+                switch (u8Cmd) {
+                    case LED_I2C_REG_PACKET:
+                        // The master is requesting a read-out of all the data we have in our
+                        // buffer.
+                        su16I2CReadAddr = 0;
+                        break;
+                    default:
+                        // If we don't recognise this command, treat it as a register read.
+                        // (Back-compat with stock LED firmware)
+                        su16I2CReadAddr = u8Cmd;
+                        break;
+                }
+                u16I2CRxIndex++;
+            } else {
+                // TODO: Currently we don't expose u8Cmd anywhere
+                if (gpu8I2CRx != NULL) {
+                    gpu8I2CRx[u16I2CRxIndex - 1] = u8Data;
+                    // TODO: Have some bounds checking, and NACK an out of bounds write
+                }
+                u16I2CRxIndex++;
+            }
+
+            I2C_SET_CONTROL_REG(I2C1, I2C_I2CON_SI_AA);  // (B3,S3)
+            break;
+        case I2C_SLAVE_RX_DATA_NACK:
+            I2C_SET_CONTROL_REG(I2C1, I2C_I2CON_SI_AA);
+            u16I2CRxIndex = 0;
+            break;
+        case I2C_SLAVE_TX_REPEAT_START_STOP:             // (B4)
+            I2C_SET_CONTROL_REG(I2C1, I2C_I2CON_SI_AA);  // (B5)
+            u16I2CRxIndex = 0;
+            break;
+
+        // === Transmit our data ===
+        case I2C_SLAVE_TX_ADDR_ACK:                           // (B6)
+        case I2C_SLAVE_TX_DATA_ACK:                           // We got an ACK, and need to continue
+            I2C_SET_DATA(I2C1, gu8LEDTx[su16I2CReadAddr++]);  // (B7)
+            I2C_SET_CONTROL_REG(I2C1, I2C_I2CON_SI_AA);
+            break;
+        case I2C_SLAVE_TX_LAST_DATA_ACK:  // We got an ACK, but it's time to stop
+            I2C_SET_CONTROL_REG(I2C1, I2C_I2CON_SI);
+            u16I2CRxIndex = 0;
+            break;
+        case I2C_SLAVE_TX_DATA_NACK:  // We got a NACK; master has read enough data
+            I2C_SET_CONTROL_REG(I2C1, I2C_I2CON_SI_AA);
+            u16I2CRxIndex = 0;
+            break;
+
+        // === Error cases ===
+        case I2C_SLAVE_RX_ARBITRATION_LOST:  // SLA+W
+        case I2C_SLAVE_TX_ARBITRATION_LOST:  // SLA+R
+            I2C_SET_CONTROL_REG(I2C1, I2C_I2CON_SI_AA);
+            u16I2CRxIndex = 0;
+            break;
+    }
+}
 void I2C1_IRQHandler(void) {
     if (I2C_GET_TIMEOUT_FLAG(I2C1)) {
         I2C_ClearTimeoutFlag(I2C1);
     } else {
-        if (s_I2C1HandlerFn != NULL) (s_I2C1HandlerFn)(I2C1->I2CSTATUS);
-    }
-}
-
-void I2C1_SlaveTx(uint32_t u32Status) {
-    static uint8_t su8I2CReadAddr = 0;
-
-    switch (u32Status) {
-        case SLAVE_RX_ACK:
-            su8I2CReadAddr = I2C1->I2CDAT;
-            su8LedTxDataLock = 1;
-            I2C_SET_CONTROL_REG(I2C1, I2C_I2CON_SI_AA);
-            break;
-        case SLAVE_TX_ACK:
-            I2C_SET_DATA(I2C1, gu8LEDTx[su8I2CReadAddr]);
-            I2C_SET_CONTROL_REG(I2C1, I2C_I2CON_SI_AA);
-            break;
-
-        case SLAVE_RX_ADDR_ACK:
-        case I2C_SLAVE_TX_NACK:
-        case I2C_SLAVE_RX_NACK:
-        case I2C_SLAVE_TX_REPEAT_START_STOP:
-            I2C_SET_CONTROL_REG(I2C1, I2C_I2CON_SI_AA);
-            break;
-
-        default:
-            // Hmm?
-            I2C_SET_CONTROL_REG(I2C1, I2C_I2CON_SI_AA);
-            break;
+        I2C1_SlaveTx(I2C1->I2CSTATUS);
     }
 }
 
 void LED_I2C1_Init(void) {
-    I2C_Open(I2C1, 100000);
+    I2C_Open(I2C1, 400 kHz);
     I2C_SetSlaveAddr(I2C1, 0, 0x18, 0);
     I2C_SetSlaveAddr(I2C1, 1, 0x30, 0);
     I2C_SetSlaveAddr(I2C1, 2, 0x55, 0);
@@ -69,344 +145,118 @@ void LED_I2C1_Init(void) {
 
     // I2C1 enter no address SLV mode
     I2C_SET_CONTROL_REG(I2C1, I2C_I2CON_SI_AA);
-
-    s_I2C1HandlerFn = I2C1_SlaveTx;
 }
 
-// static inline void LEDTxLock(void) {
-//     gu8LEDTx[0] = 0;
-// }
-// static inline void LEDTxCommit(uint8_t u8Command, uint8_t u8NExpected) {
-//     gu8LEDTx[0] = u8Command;
-// }
+static const uint8_t _LED_GroundBrightness(void) {
+    if (gbLedDataIsControlledInt) return gConfig.u8LedGroundBrightness;
+    if (g_u8UsbState == USB_STATE_SUSPEND && gu32NowMs > 5000) return 0;
+    if (gbLedDataIsControlledExt) {
+        // The game is going to tell us how bright it wants the LEDs
+        // For chunithm, that's 40/63 = 63.5% brightness.
+        // TODO: Do we actually want to do this? Chunithm has no way for operators to change it
+        // TODO: This won't be reflected in gu8LEDTx[1] with our custom firmware
 
-/**
- * @brief Convert from RGB to HSV
- *
- * @param pu8aRGB Destination 3-tuple to receive RGB values
- * @param u16H Hue, ranging 0~LED_HUE_MAX
- * @param u8S Saturation, ranging 0~255
- * @param u8V Value, ranging 0~255
- */
-void HsvToRgb(uint8_t* pu8aRGB, uint16_t u16H, uint8_t u8S, uint8_t u8V) {
-    if (u8S == 0) {
-        pu8aRGB[0] = u8V;
-        pu8aRGB[1] = u8V;
-        pu8aRGB[2] = u8V;
-        return;
+        // The real range for this value is 0~63
+        // Chunithm will always be sending a constant value of 40 though, as far as I'm aware.
+        // Because of that, if we performed the scaling we'd be getting 40/63 = 63.5% brightness.
+        // Instead, we're only going to scale on the off-chance that the brightness is actually
+        // changed and it goes below 40.
+        // During startup the brightness is set to 0, but all LEDs are zeroed too so... :D
+        if (gu8GameBrightness < 40)
+            return ((uint16_t)gConfig.u8LedGroundBrightness * (uint16_t)gu8GameBrightness) / 63;
+        return gConfig.u8LedGroundBrightness;
     }
-
-    uint8_t region = u16H / (LED_HUE_MAX / 6);
-    uint8_t remainder = (u16H - (region * (LED_HUE_MAX / 6))) * (255 / (LED_HUE_MAX / 6));
-
-    uint8_t p = (u8V * (255 - u8S)) >> 8;
-    uint8_t q = (u8V * (255 - ((u8S * remainder) >> 8))) >> 8;
-    uint8_t t = (u8V * (255 - ((u8S * (255 - remainder)) >> 8))) >> 8;
-
-    switch (region) {
-        case 0:
-            pu8aRGB[0] = u8V;
-            pu8aRGB[1] = t;
-            pu8aRGB[2] = p;
-            break;
-        case 1:
-            pu8aRGB[0] = q;
-            pu8aRGB[1] = u8V;
-            pu8aRGB[2] = p;
-            break;
-        case 2:
-            pu8aRGB[0] = p;
-            pu8aRGB[1] = u8V;
-            pu8aRGB[2] = t;
-            break;
-        case 3:
-            pu8aRGB[0] = p;
-            pu8aRGB[1] = q;
-            pu8aRGB[2] = u8V;
-            break;
-        case 4:
-            pu8aRGB[0] = t;
-            pu8aRGB[1] = p;
-            pu8aRGB[2] = u8V;
-            break;
-        default:
-            pu8aRGB[0] = u8V;
-            pu8aRGB[1] = p;
-            pu8aRGB[2] = q;
-            break;
-    }
-
-    return;
+    return gConfig.u8LedGroundBrightness;
+}
+static const uint8_t _LED_WingBrightness(void) {
+    if (gbLedDataIsControlledInt) return gConfig.u8LedWingBrightness;
+    if (g_u8UsbState == USB_STATE_SUSPEND && gu32NowMs > 5000) return 0;
+    if (gbLedDataIsControlledExt)
+        return ((uint16_t)gConfig.u8LedGroundBrightness * (uint16_t)gu8IO4PWMScale) / 255;
+    return gConfig.u8LedWingBrightness;
 }
 
-// 0x00: Normal operation (all other values ignore ground data)
-// 0x01: [Stock] Uses colours. Bar 1 full (from right)
-// 0x02: [Stock] Uses colours. Bar 2 full (from right)
-// 0x03: [Stock] Uses colours. Bar 3 full (from right)
-// 0x04: [Stock] Uses colours. Bar 4 full (from right)
-// 0x1X: [Stock] All white with black gaps. X bars black (from right)
-// 0x1X: [CFW] Rainbow with black gaps. X bars black (from right)
-// 0x20: [CFW] Flashes three times
-// 0x80: [Stock] Flashes three times
-static uint8_t su8LedSpecial = 0x05;
-
-// 0: Separator bar every 4 (4 sections)
-// 1: Separator bar every 2 (8 sections)
-// 2: Separator bar every 1 (16 sections)
-// 3: No separator bars
-// 4~7: LEDs off
-// For some reason this value can be |8, even though firmware suggests otherwise
-static uint8_t su8LedSeparators = 1;
-
-// 0: Invalid, but functions as 1
-// 1: 32-key mode
-// 2: 16-key mode (same as 32key mode)
-// 3: 8-key mode (bars light in pairs)
-// 4: 4-key mode (bars light in quads)
-static uint8_t su8LedNKey = 1;
-
-// 0x40: Turns off ground LEDs
-// 0x80: Turns off wing LEDs
-static uint8_t su8LedOff = 0;
-
-// 0x8X: Separator 1~(X+1) lit (ie X ranges from 0~E; F is the same as E)
-static uint8_t su8LedCfwRainbow = 0x8F;
-
-void LED_WriteBasicGrounds(void) {
-    gu8LEDTx[0] = LED_CMD_BASIC;
-
-    // 32 bits of grounds
-    // (01,02)=key1, (04,08)=key2 (10,20)=key3, (40,80)=key4
-    gu8LEDTx[1] = 0;
-    gu8LEDTx[2] = 0;
-    gu8LEDTx[3] = 0;
-    gu8LEDTx[4] = 0;
-    for (uint8_t i = 0; i < 4; i++) {
-        for (uint8_t j = 0; j < 8; j++) {
-            if (gu8GroundData[i * 8 + j] > PSoC_INTERNAL_DIGITAL_TH) gu8LEDTx[i + 1] |= (1 << j);
-        }
-    }
-
-#ifdef LED_FIRMWARE_CFW
-    gu8LEDTx[5] = 0;  // Wing fill
-    for (uint8_t i = 0; i < 6; i++)
-        if (gu8DigitalButtons & (1 << (i + 2))) gu8LEDTx[5] |= 1 << i;
-    gu8LEDTx[6] = su8LedCfwRainbow;
-    gu8LEDTx[7] = 0;  // Unused
-#else
-    // Wings
-    gu8LEDTx[5] = 0;  // Wing fill
-    for (uint8_t i = 0; i < 6; i++)
-        if (gu8DigitalButtons & (1 << (i + 2))) gu8LEDTx[5] |= 1 << i;
-    gu8LEDTx[6] = gConfig.u16HueWingLeft / LED_HUE_SCALE;   // Hue left (default 330)
-    gu8LEDTx[7] = gConfig.u16HueWingRight / LED_HUE_SCALE;  // Hue right (default 180)
-#endif
-
-    // Unused in CFW
-    gu8LEDTx[8] = gConfig.u16HueGround / LED_HUE_SCALE;        // Hue ground inactive (default 45)
-    gu8LEDTx[9] = gConfig.u16HueGroundActive / LED_HUE_SCALE;  // Hue ground active (default 330)
-
-    // In CFW only su8LedOff is respected
-    gu8LEDTx[10] = (su8LedSeparators << 4) | su8LedOff | su8LedNKey;
-    gu8LEDTx[11] = su8LedSpecial;
+static inline void _LED_SetPower(void) {
+    PIN_LED_GROUND_PWR = _LED_GroundBrightness() ? 1 : 0;
+    PIN_LED_WING_PWR = _LED_WingBrightness() ? 1 : 0;
 }
 
-static const uint8_t su8aWingSensors[LED_NUM_LEFT] = {
-    DIGITAL_AIR1_Msk, DIGITAL_AIR1_Msk, DIGITAL_AIR1_Msk, DIGITAL_AIR1_Msk,  //
-    DIGITAL_AIR2_Msk, DIGITAL_AIR2_Msk, DIGITAL_AIR2_Msk, DIGITAL_AIR2_Msk,  //
-    DIGITAL_AIR3_Msk, DIGITAL_AIR3_Msk, DIGITAL_AIR3_Msk, DIGITAL_AIR3_Msk,  //
-    DIGITAL_AIR4_Msk, DIGITAL_AIR4_Msk, DIGITAL_AIR4_Msk, DIGITAL_AIR4_Msk,  //
-    DIGITAL_AIR5_Msk, DIGITAL_AIR5_Msk, DIGITAL_AIR5_Msk, DIGITAL_AIR5_Msk,  //
-    DIGITAL_AIR6_Msk, DIGITAL_AIR6_Msk, DIGITAL_AIR6_Msk, DIGITAL_AIR6_Msk,  //
-};
+void LED_Write(void) {
+    Pled_rx_custom_rgb pTxRGB = (Pled_rx_custom_rgb)gu8LEDTx;
+    Pled_rx_custom_hsv pTxHSV = (Pled_rx_custom_hsv)gu8LEDTx;
+    Pled_rx_custom_mixed pTxMix = (Pled_rx_custom_mixed)gu8LEDTx;
+    // We might not use all of these (we aren't using RGB at the moment!) but they're just
+    // convenience aliases.
+    (void)pTxRGB;
+    (void)pTxHSV;
+    (void)pTxMix;
 
-#define SATURATION_ACTIVE 255
-#define SATURATION_INACTIVE 240
-#define VALUE_ACTIVE (gConfig.u8LedWingBrightness)
-#define VALUE_INACTIVE (gConfig.u8LedWingBrightness / 2)
-
-static void LED_OffGround(void) {
-    memset((uint8_t*)&gu8LEDTx[LED_DATA_OFFSET], 0, LED_NUM_GROUND * 3);
-}
-static void LED_OffWings(void) {
-    memset((uint8_t*)&gu8LEDTx[LED_DATA_OFFSET + LED_NUM_GROUND * 3], 0,
-           (LED_NUM_LEFT + LED_NUM_RIGHT) * 3);
-}
-static void LED_AirWings(void) {
-    uint8_t u8aRgbActive[3];
-    uint8_t u8aRgbInactive[3];
-
-    uint8_t j, i = LED_NUM_GROUND;
-
-    // Left wing
-    HsvToRgb(u8aRgbActive, gConfig.u16HueWingLeft, SATURATION_ACTIVE, VALUE_ACTIVE);
-    HsvToRgb(u8aRgbInactive, gConfig.u16HueWingLeft, SATURATION_INACTIVE, VALUE_INACTIVE);
-    for (j = 0; i < LED_NUM_GROUND + LED_NUM_LEFT; i++, j++) {
-        // GRB
-        if (gu8DigitalButtons & su8aWingSensors[LED_NUM_LEFT - j - 1]) {
-            gu8LEDTx[LED_DATA_OFFSET + i * 3 + 0] = u8aRgbActive[1];
-            gu8LEDTx[LED_DATA_OFFSET + i * 3 + 1] = u8aRgbActive[0];
-            gu8LEDTx[LED_DATA_OFFSET + i * 3 + 2] = u8aRgbActive[2];
-        } else {
-            gu8LEDTx[LED_DATA_OFFSET + i * 3 + 0] = u8aRgbInactive[1];
-            gu8LEDTx[LED_DATA_OFFSET + i * 3 + 1] = u8aRgbInactive[0];
-            gu8LEDTx[LED_DATA_OFFSET + i * 3 + 2] = u8aRgbInactive[2];
-        }
-    }
-
-    // Right wing
-    HsvToRgb(u8aRgbActive, gConfig.u16HueWingRight, SATURATION_ACTIVE, VALUE_ACTIVE);
-    HsvToRgb(u8aRgbInactive, gConfig.u16HueWingRight, SATURATION_INACTIVE, VALUE_INACTIVE);
-    for (j = 0; i < LED_NUM_GROUND + LED_NUM_LEFT + LED_NUM_RIGHT; i++, j++) {
-        // GRB
-        if (gu8DigitalButtons & su8aWingSensors[j]) {
-            gu8LEDTx[LED_DATA_OFFSET + i * 3 + 0] = u8aRgbActive[1];
-            gu8LEDTx[LED_DATA_OFFSET + i * 3 + 1] = u8aRgbActive[0];
-            gu8LEDTx[LED_DATA_OFFSET + i * 3 + 2] = u8aRgbActive[2];
-        } else {
-            gu8LEDTx[LED_DATA_OFFSET + i * 3 + 0] = u8aRgbInactive[1];
-            gu8LEDTx[LED_DATA_OFFSET + i * 3 + 1] = u8aRgbInactive[0];
-            gu8LEDTx[LED_DATA_OFFSET + i * 3 + 2] = u8aRgbInactive[2];
-        }
-    }
-}
-
-static uint8_t LED_ScaleU8(uint8_t u8V, uint8_t u8Scale) {
-    return ((uint16_t)u8V * (uint16_t)u8Scale) / 255;
-}
-
-static void LED_GroundRainbow(void) {
-    uint8_t u8aRGB[3];
-
-    // 5 ticks * 360 hue = 1800 calls for one cycle (1.8s)
-    static uint16_t u16Hue = 0;
-    static uint8_t u8Ticker = 0;
-    if (++u8Ticker == 5) {
-        u8Ticker = 0;
-        u16Hue++;
-        if (u16Hue == LED_HUE_MAX) u16Hue = 0;
-    }
-
-    /**
-     * There are 48 LEDs for ground, but we only send 31 values
-     * They're mapped to the LEDs as follows:
-     *   00a11b22c33d44f55g66h77i...
-     *
-     * That is, we can't split-colour a key :P
-     */
-    for (uint8_t i = 0; i < LED_NUM_GROUND; i++) {
-        uint8_t v = 190;
-        uint8_t h = 0;
-        uint8_t nCell = i >> 1;
-        if (i % 2 == 0) {
-            if (gu16PSoCDigital & (1 << nCell)) {
-                v = 255;
-                h = LED_HUE_MAX / 2;
-            }
-        } else if (nCell % 4 == 3) {
-            h = LED_HUE_MAX / 2;
-        }
-
-        // GRB
-        HsvToRgb(u8aRGB, (u16Hue + h + (i * (LED_HUE_MAX / LED_NUM_GROUND))) % LED_HUE_MAX, v,
-                 LED_ScaleU8(v - 63, gConfig.u8LedGroundBrightness));
-
-        gu8LEDTx[LED_DATA_OFFSET + i * 3 + 0] = u8aRGB[1];
-        gu8LEDTx[LED_DATA_OFFSET + i * 3 + 1] = u8aRGB[0];
-        gu8LEDTx[LED_DATA_OFFSET + i * 3 + 2] = u8aRGB[2];
-    }
-}
-static void LED_GroundStatic(void) {
-    uint8_t u8aGround[3];
-    uint8_t u8aGroundActive[3];
-
-    HsvToRgb(u8aGround, gConfig.u16HueGround, 255, gConfig.u8LedGroundBrightness);
-    HsvToRgb(u8aGroundActive, gConfig.u16HueGroundActive, 255, gConfig.u8LedGroundBrightness);
-    for (uint8_t i = 0; i < LED_NUM_GROUND; i++) {
-        const uint8_t nCell = i >> 1;
-        if (i % 2 == 0) {
-            // This is a cell. Light it according to the touch input
-            if (gu16PSoCDigital & (1 << nCell)) {
-                gu8LEDTx[LED_DATA_OFFSET + i * 3 + 0] = u8aGroundActive[1];
-                gu8LEDTx[LED_DATA_OFFSET + i * 3 + 1] = u8aGroundActive[0];
-                gu8LEDTx[LED_DATA_OFFSET + i * 3 + 2] = u8aGroundActive[2];
-            } else {
-                gu8LEDTx[LED_DATA_OFFSET + i * 3 + 0] = u8aGround[1];
-                gu8LEDTx[LED_DATA_OFFSET + i * 3 + 1] = u8aGround[0];
-                gu8LEDTx[LED_DATA_OFFSET + i * 3 + 2] = u8aGround[2];
-            }
-        } else if (nCell % 4 == 3) {
-            // This is a separating divider. Light it with the active colour
-            gu8LEDTx[LED_DATA_OFFSET + i * 3 + 0] = u8aGroundActive[1];
-            gu8LEDTx[LED_DATA_OFFSET + i * 3 + 1] = u8aGroundActive[0];
-            gu8LEDTx[LED_DATA_OFFSET + i * 3 + 2] = u8aGroundActive[2];
-        } else {
-            // This is a non-separating divider. Light it based on the two cells either side
-            if (gu16PSoCDigital & (1 << nCell) && gu16PSoCDigital & (1 << (nCell + 1))) {
-                gu8LEDTx[LED_DATA_OFFSET + i * 3 + 0] = u8aGroundActive[1];
-                gu8LEDTx[LED_DATA_OFFSET + i * 3 + 1] = u8aGroundActive[0];
-                gu8LEDTx[LED_DATA_OFFSET + i * 3 + 2] = u8aGroundActive[2];
-            } else {
-                gu8LEDTx[LED_DATA_OFFSET + i * 3 + 0] = u8aGround[1];
-                gu8LEDTx[LED_DATA_OFFSET + i * 3 + 1] = u8aGround[0];
-                gu8LEDTx[LED_DATA_OFFSET + i * 3 + 2] = u8aGround[2];
-            }
-        }
-    }
-}
-
-void LED_WriteRGB(void) {
-    gu8LEDTx[0] = LED_CMD_RGB_FULL;
-
-#ifdef LED_FIRMWARE_CFW
-    // "CFW" added this byte
-    gu8LEDTx[1] = su8LedSpecial | su8LedOff;
-#endif
-
-    // Even when grounds are disabled, internal control overrides that
+    // If we're internally controlled, data will be HSV
     if (gbLedDataIsControlledInt) {
-        PIN_LED_GROUND_PWR = 1;
+        pTxHSV->u8Cmd = LED_CMD_CUSTOM_HSV;
+        pTxHSV->u8GroundBrightness = _LED_GroundBrightness();
+        pTxHSV->u8WingBrightness = _LED_WingBrightness();
+        _LED_SetPower();
 
-        uint8_t u8aRGB[3];
-        // Convert from HSV to GRB
-        for (uint8_t i = 0; i < LED_NUM_GROUND; i++) {
-            HsvToRgb(u8aRGB, gaControlledIntLedData[LED_NUM_GROUND - i - 1].u16H,
-                     gaControlledIntLedData[LED_NUM_GROUND - i - 1].u8S,
-                     gaControlledIntLedData[LED_NUM_GROUND - i - 1].u8V);
+        LED_Ground_Internal_HSV(pTxHSV->aGround);
+        LED_Wings_Reactive_HSV(&pTxHSV->Wings);
+    } else if (gbLedDataIsControlledExt) {
+        // RGB control from the game
+        pTxRGB->u8Cmd = LED_CMD_CUSTOM_RGB;
+        pTxRGB->u8GroundBrightness = _LED_GroundBrightness();
+        pTxRGB->u8WingBrightness = _LED_WingBrightness();
+        _LED_SetPower();
 
-            gu8LEDTx[LED_DATA_OFFSET + i * 3 + 0] = u8aRGB[1];
-            gu8LEDTx[LED_DATA_OFFSET + i * 3 + 1] = u8aRGB[0];
-            gu8LEDTx[LED_DATA_OFFSET + i * 3 + 2] = u8aRGB[2];
-        }
-    } else if (gConfig.u8LedGroundBrightness) {
-        PIN_LED_GROUND_PWR = 1;
+        LED_Ground_Controlled_RGB(pTxRGB->aGround);
+        LED_Wings_Controlled_RGB(&pTxRGB->Wings);
+    } else {
+        // User-set coloring scheme
+        pTxHSV->u8Cmd = LED_CMD_CUSTOM_HSV;
+        pTxHSV->u8GroundBrightness = _LED_GroundBrightness();
+        pTxHSV->u8WingBrightness = _LED_WingBrightness();
+        _LED_SetPower();
 
-        if (gbLedDataIsControlledExt) {
-            // Swap from BRG to GRB
-            for (uint8_t i = 0; i < LED_NUM_GROUND; i++) {
-                gu8LEDTx[LED_DATA_OFFSET + i * 3 + 0] =
-                    LED_ScaleU8(gu8aControlledExtLedData[i * 3 + 2], gConfig.u8LedGroundBrightness);
-                gu8LEDTx[LED_DATA_OFFSET + i * 3 + 1] =
-                    LED_ScaleU8(gu8aControlledExtLedData[i * 3 + 1], gConfig.u8LedGroundBrightness);
-                gu8LEDTx[LED_DATA_OFFSET + i * 3 + 2] =
-                    LED_ScaleU8(gu8aControlledExtLedData[i * 3 + 0], gConfig.u8LedGroundBrightness);
-            }
-        } else if (gConfig.bEnableRainbow) {
-            LED_GroundRainbow();
+        if (gConfig.bEnableRainbow) {
+            LED_Ground_Rainbow_HSV(pTxHSV->aGround);
         } else {
-            LED_GroundStatic();
+            LED_Ground_Static_HSV(pTxHSV->aGround);
         }
-    } else {
-        PIN_LED_GROUND_PWR = 0;
-        LED_OffGround();
+        LED_Wings_Reactive_HSV(&pTxHSV->Wings);
     }
+}
 
-    if (gConfig.u8LedWingBrightness) {
-        PIN_LED_WING_PWR = 1;
-        // TODO: Get data from game when gbLedDataIsControlledExt (HID, probably)
-        LED_AirWings();
-    } else {
-        PIN_LED_WING_PWR = 0;
-        LED_OffWings();
-    }
+#define I2C_WaitTimeout (SystemCoreClock / 5);
+#define WAIT_INDEX(cond)                        \
+    do {                                        \
+        u32TimeOutCnt = I2C_WaitTimeout;        \
+        while (u16I2CRxIndex cond) {            \
+            if (--u32TimeOutCnt == 0) return 0; \
+        }                                       \
+    } while (0)
+
+uint8_t LED_FMC_Read(uint32_t u32Offset, uint32_t* pu32Data) {
+    static volatile uint32_t u32Data;
+    u32Data = 0xFFFFFFFF;
+    uint32_t u32TimeOutCnt;
+
+    // Wait for anything in the buffer to be read
+    WAIT_INDEX(!= 0);
+    WAIT_INDEX(== 0);
+    // Request a 4-byte read from the LED board
+    gpu8I2CRx = (volatile uint8_t*)&u32Data;
+    gu8LEDTx[0] = 0;
+    gu8LEDTx[1] = u32Offset & 0xff;
+    gu8LEDTx[2] = (u32Offset >> 8) & 0xff;
+    gu8LEDTx[3] = (u32Offset >> 16) & 0xff;
+    gu8LEDTx[4] = (u32Offset >> 24) & 0xff;
+    gu8LEDTx[0] = LED_CMD_FMC_READ;
+
+    // Wait for our packet to be sent
+    WAIT_INDEX(!= 0);
+    WAIT_INDEX(== 0);
+    // Wait for the LED board to send its response
+    WAIT_INDEX(!= 5);
+
+    if (pu32Data) *pu32Data = u32Data;
+    return 1;
 }

@@ -51,7 +51,6 @@ void FMC_EEPROM_Load(void) {
     if (gConfig.u32Magic != DATAFLASH_MAGIC) {
         // Zeroing flags first means GCC knows we don't care about the other bits
         gConfig.u8Flags = 0;
-        gConfig.bEnableIO4 = 1;
         gConfig.bEnableKeyboard = 0;
         gConfig.bEnableRainbow = 1;
 
@@ -59,6 +58,7 @@ void FMC_EEPROM_Load(void) {
 
         gConfig.u16HueWingLeft = 330;
         gConfig.u16HueWingRight = 180;
+        // TODO: These are the DJ DAO defaults, but the game looks like the hue should be 60 and 300
         gConfig.u16HueGround = 45;
         gConfig.u16HueGroundActive = 330;
 

@@ -26,7 +26,7 @@ static uint8_t su8VendorCount = 0;
 void Tas_USBD_Open(void) {
     g_usbd_CtrlMaxPktSize = gpDeviceDescriptor->bMaxPacketSize0;
     USBD->ATTR = 0x650;  // Disable D+ and USB controller
-    CLK_SysTickLongDelay(3000 ms);
+    CLK_SysTickLongDelay(1000 ms);
     USBD->ATTR = 0x7D0;
     USBD_SET_SE0();
 }
@@ -189,18 +189,10 @@ static inline void Tas_USBD_GetDescriptor(void) {
                     break;
 
                 case USB_STRING_VENDOR: {
-                    const char *szVendor;
-                    if (su8VendorCount < 2) {
-                        szVendor = gszVendorInitial;
-                        su8VendorCount++;
-                    } else {
-                        szVendor = gszVendor;
-                    }
-
-                    uint8_t u8Len = strlen(szVendor);
+                    uint8_t u8Len = strlen(gszVendor);
                     u8Str[0] = 2 + u8Len * 2;
                     for (uint8_t i = 0; i < u8Len; i++) {
-                        u8Str[2 + i * 2] = szVendor[i];
+                        u8Str[2 + i * 2] = gszVendor[i];
                         u8Str[2 + i * 2 + 1] = 0;
                     }
                     break;
@@ -215,8 +207,10 @@ static inline void Tas_USBD_GetDescriptor(void) {
                     break;
                 }
                 case USB_STRING_SERIAL: {
-                    // TODO: I think it might be a u16 then two u8s?
-                    // Need to check the TRM
+                    // The unique ID is technically 3 words, but I'm pretty sure only the last one
+                    // really changes. The TRM has no details regarding this.
+                    // There's no harm using all three as our serial, so to stay on the safe side
+                    // that's what we do.
                     uint32_t u32serial;
 
                     FMC_Open();

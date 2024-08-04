@@ -46,16 +46,16 @@
 #define USB_MUX_HOST 0
 #define USB_MUX_LEDS 1
 
-#define DIGITAL_FN1_Pos 0
-#define DIGITAL_FN2_Pos 1
+#define DIGITAL_FN2_Pos 0
+#define DIGITAL_FN1_Pos 1
 #define DIGITAL_AIR1_Pos 2
 #define DIGITAL_AIR2_Pos 3
 #define DIGITAL_AIR3_Pos 4
 #define DIGITAL_AIR4_Pos 5
 #define DIGITAL_AIR5_Pos 6
 #define DIGITAL_AIR6_Pos 7
-#define DIGITAL_FN1_Msk (1 << DIGITAL_FN1_Pos)
 #define DIGITAL_FN2_Msk (1 << DIGITAL_FN2_Pos)
+#define DIGITAL_FN1_Msk (1 << DIGITAL_FN1_Pos)
 #define DIGITAL_AIR1_Msk (1 << DIGITAL_AIR1_Pos)
 #define DIGITAL_AIR2_Msk (1 << DIGITAL_AIR2_Pos)
 #define DIGITAL_AIR3_Msk (1 << DIGITAL_AIR3_Pos)

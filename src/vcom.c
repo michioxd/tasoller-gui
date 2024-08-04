@@ -3,7 +3,8 @@
 #define BUF_SIZE_RX 512
 #define BUF_SIZE_TX 512
 
-volatile uint8_t gu8VcomReady = 0;
+volatile uint8_t gu8VcomDTEPresent = 0;
+volatile uint8_t gu8VComReady = 0;
 
 static volatile uint8_t gau8ComRbuf[BUF_SIZE_RX];
 static volatile uint16_t gu16ComRbytes = 0;
@@ -26,10 +27,10 @@ void _USB_VCOM_Tick_Tx(void) {
     uint32_t u32Len;
     if (gu32TxSize != 0) return;
 
-    // Check wether we have new COM Rx data to send to USB or not
+    // Check whether we have new COM Rx data to send to USB or not
     if (!gu16ComRbytes) {
-        // Prepare a zero packet if previous packet size is USBD_CDC_IN_MAX_SIZE and
-        // no more data to send at this moment to note Host the transfer has been done
+        // Prepare a zero packet if previous packet size is USBD_CDC_IN_MAX_SIZE and no more data to
+        // send at this moment to notify to the Host that the transfer has been done
         u32Len = USBD_GET_PAYLOAD_LEN(EP_CDC_IN);
         if (u32Len == USBD_CDC_IN_MAX_SIZE) USBD_SET_PAYLOAD_LEN(EP_CDC_IN, 0);
         return;

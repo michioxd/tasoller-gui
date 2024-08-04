@@ -39,31 +39,45 @@ If `COM1` is already in use, check what device it is assigned to in Device Manag
 
 Pre-chusan Chunithm uses IO3. This firmware does not (and unfortunately cannot) support IO3. It is recommended to enable the HID keyboard mode, and continue to use keyboard input for IRs.
 
-## Configuration
-Hold FN2 for configuration. It is not the same as stock DAO.
+## Controls
+### General
+Tap FN1 to insert a coin. FN2 is currently unbound.
 
-- Pad 1/2 (cell 0): Left wing colour
+### Configuration
+Hold FN1 for configuration:
+
+- Pad 1/2 (cell 0): Left tower colour
 - Pad 3/4 (cell 1): Ground colour
 - Pad 5/6 (cell 2): Ground colour when pressed, and separator colour
-- Pad 7/8 (cell 3): Right wing colour
+- Pad 7/8 (cell 3): Right tower colour
 - Pad 9/10 (cell 4): No function
 - Pad 11/12 (cell 5): Toggle rainbow effect on/off
 - Pad 13/14 (cell 6): Increase/decrease ground brightness
-- Pad 15/16 (cell 7): Increase/decrease wing brightness
+- Pad 15/16 (cell 7): Increase/decrease tower brightness
 - Pad 17/18 (cell 8): No function
-- Pad 19/20 (cell 9): No function
-- Pad 21/22 (cell 10): No function
+- Pad 19/20 (cell 9): System volume up/down
+- Pad 21/22 (cell 10): Holds Enter for 5 seconds (insert Aime card)
 - Pad 23/24 (cell 11): No function
 - Pad 25/26 (cell 12): Increase/decrease sensitivity
 - Pad 27/28 (cell 13): No function
-- Pad 29/30 (cell 14): Toggle HID keyboard mode
-- Pad 31/32 (cell 15): Toggle IO4 emulation mode
+- Pad 29/30 (cell 14): No function
+- Pad 31/32 (cell 15): Toggle HID keyboard mode
 
-## Calibration
-Make sure no hands or objects are near the slider before starting calibration.
+### Test menu
+To enter the system test menu, double-tap FN2. This will mirror the on-screen controls, and additionally adds controls for the TEST and SERVICE buttons on a real cabinet. Double-tap FN2 again to leave this mode on the controller (note that this is not synced with the game exiting the menu!).
 
-Hold FN1 for two seconds; the slider will flash red for a few seconds, then fill up with a blue bar.
+Cell 6 and 7 are the TEST button, and cell 8 and 9 are the SERVICE button.
 
-The slider will then briefly flash green. After this, begin to rub your hands across the slider as much as possible! The cells will turn increasingly green; the greener you can get them the better. Once the dividers have turned green you can save your calibration by pressing FN2.
+To access the TEST and SERVICE buttons without entering the test menu, hold FN2 instead.
 
-**Note:** Calibration is a separate process to adjusting the sensor sensitivity. It is recommended to re-calibrate after adjustment of sensitivity. For the best performance, run a re-calibration before every play session to account for changes in your room's temperature and humidity.
+## Keyboard Mapping
+When the HID keyboard is enabled, the following mapping (UMIGURI defaults) is used:
+
+```
+I8U7Y6T5R4E3W2Q1
+9KMJNHBGVFCDXSZA
+```
+
+with the airs mapped as `0OLP,.`.
+
+Please note that this is slightly different to stock firmware!

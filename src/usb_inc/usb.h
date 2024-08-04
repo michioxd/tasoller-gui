@@ -1,6 +1,8 @@
 #pragma once
 #include <stdint.h>
 
+#include "../_compiler.h"
+
 // USB U16 helpers
 #define U16(_high, _low) ((uint16_t)(((_high) << 8) | (_low)))
 #define U16_HIGH(_u16) ((uint8_t)(((_u16) >> 8) & 0x00ff))

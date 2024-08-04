@@ -16,6 +16,6 @@ OPTIM ?= -flto -Os
 GCCFLAGS := $(SPECS) -nolibc -nostdlib -nostartfiles -nodefaultlibs -mcpu=cortex-m0 -mthumb -Wl,--gc-sections $(OPTIM) -g
 
 CFLAGS := $(GCCFLAGS) -c -ffunction-sections -fdata-sections -fsigned-char \
-         -fmessage-length=0 -ffreestanding
+         -fmessage-length=0 -ffreestanding -fstack-usage -Wall
 ASFLAGS := $(GCCFLAGS) -c -x assembler-with-cpp
 LDFLAGS := $(GCCFLAGS) -Lpicolibc/arm-none-eabi/picolibc/arm-none-eabi/lib/thumb/v6-m/nofp

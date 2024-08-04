@@ -52,7 +52,7 @@
 #define PAD_31_Msk BIT0
 #define PAD_32_Msk BIT1
 
-typedef enum {
+typedef enum : uint8_t {
     // =========================
     // Actually used by Chunithm
     // =========================
@@ -69,9 +69,14 @@ typedef enum {
     /* Retrieve hardware information (model number, etc.) */
     SLIDER_CMD_Rx_HW_INFO = 0xF0,
 
-    // ======
-    // Autism
-    // ======
+    // ==========================================
+    // Custom additions, used for debugging, etc.
+    // ==========================================
+    SLIDER_CMD_Rx_DEBUG = 0xF1,
+
+    // =====================================================================
+    // Required for a complete slider implementation, but unused by the game
+    // =====================================================================
     /* Request a single standard report */
     SLIDER_CMD_Rx_REPORT = 0x01,
     /* Set LED brightness and BRG values, with a report as the response */
@@ -98,7 +103,27 @@ typedef enum {
     /* Request the CPU status registers */
     SLIDER_CMD_Rx_CPU_STATUS = 0xE0,
 } slider_cmd_Rx;
-typedef enum {
+typedef enum : uint8_t {
+    // Actual debugging stuff
+    SLIDER_DEBUG_CMD_Rx_GET_FINGER_CAP = 0x00,
+    SLIDER_DEBUG_CMD_Rx_TRACE_RESET = 0x01,
+    SLIDER_DEBUG_CMD_Rx_GET_LAST_CS_START = 0x02,
+    SLIDER_DEBUG_CMD_Rx_GET_LAST_CS_END = 0x03,
+    SLIDER_DEBUG_CMD_Rx_PSoC_REQUEST_DEBUG = 0x04,
+
+    // Flash access
+    SLIDER_DEBUG_CMD_Rx_HOST_FMC_READ = 0x10,
+    SLIDER_DEBUG_CMD_Rx_LED_FMC_READ = 0x12,
+
+    // Chip reset
+    SLIDER_DEBUG_CMD_Rx_HOST_ENTER_LDROM = 0x20,
+    SLIDER_DEBUG_CMD_Rx_LED_ENTER_LDROM = 0x21,
+    SLIDER_DEBUG_CMD_Rx_LED_CHECK = 0x22,
+
+    // IO Access
+    SLIDER_DEBUG_CMD_Rx_LED_GET_DIGITAL = 0x30,
+} slider_debug_cmd_Rx;
+typedef enum : uint8_t {
     SLIDER_CMD_Tx_REPORT = 0x01,
     SLIDER_CMD_Tx_REPORT_DISABLE = 0x04,
 
@@ -112,8 +137,10 @@ typedef enum {
     SLIDER_CMD_Tx_CPU_STATUS = 0xE0,
     SLIDER_CMD_Tx_EXCEPTION = 0xEE,
     SLIDER_CMD_Tx_HW_INFO = 0xF0,
+
+    SLIDER_CMD_Tx_DEBUG = 0xF1,
 } slider_cmd_Tx;
-typedef enum {
+typedef enum : uint8_t {
     SLIDER_EXCEPTION_CHECKSUM = 1,
     SLIDER_EXCEPTION_BUS_ERROR = 2,
 } slider_exception;
@@ -126,7 +153,7 @@ typedef enum {
 #define SLIDER_EXCEPTION_CTX_GENERIC 0xED
 
 typedef struct __packed {
-    uint8_t u8Brightness;
+    uint8_t u8Brightness;  // Range: 0~63
     struct __packed {
         uint8_t u8B;
         uint8_t u8R;
@@ -184,6 +211,6 @@ typedef struct __packed {
     };
 } slider_cmd_Tx_cpu_status;
 
-extern uint8_t gu8GameBrightness;  // 0~63
+extern uint8_t gu8GameBrightness;  // Range: 0~63
 void Slider_TickSerial(void);
 void Slider_Tick1ms(void);

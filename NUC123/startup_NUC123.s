@@ -89,33 +89,33 @@ __Vectors:
     .size   __Vectors, . - __Vectors
 
 
-
-    .text
+    // I really want to move this into its own section but GDB messes up mapping when I do
+    @ .section .init
+    .section .text
     .thumb
     .thumb_func
     .align  2
     .global Reset_Handler
-    .type   Reset_Handler, % function
-
+    .type Reset_Handler, %function
 
 Reset_Handler:
     //  Unlock Register
-	ldr     r0, =0x50000100  // REGCTL
-	movs    r1, #0x59
-	str     r1, [r0]
-	movs    r1, #0x16
-	str     r1, [r0]
-	movs    r1, #0x88
-	str     r1, [r0]
+    ldr     r0, =0x50000100  // REGCTL
+    movs    r1, #0x59
+    str     r1, [r0]
+    movs    r1, #0x16
+    str     r1, [r0]
+    movs    r1, #0x88
+    str     r1, [r0]
     // Init POR
-	ldr     r2, =0x50000024  // PORCTL
-	movs    r1, #0x5A
+    ldr     r2, =0x50000024  // PORCTL
+    movs    r1, #0x5A
     lsls    r1,r1,8
     adds    r1,r1,#0xA5
-	str     r1, [r2]
+    str     r1, [r2]
     // Lock registers
-	movs    r1, #0
-	str     r1, [r0]
+    movs    r1, #0
+    str     r1, [r0]
 
     /*  Single section scheme.
      *
@@ -160,10 +160,12 @@ Reset_Handler:
     bgt     .L_loop3
 .L_loop3_done:
 
-#ifndef __ENTRY
-#define __ENTRY _entry
-#endif
-    bl  __ENTRY
+    // GCC doesn't realise that we're in a very strict thumb-16 mode here.
+    // GCC's linker isn't very good at locality.
+    // These two together mean that we can't perform a simple branch,
+    // because it'll end up generating a 32-bit instruction.
+    ldr     r0, =_entry
+    bx      r0
 
     .pool
     .size   Reset_Handler, . - Reset_Handler

@@ -10,7 +10,7 @@ static uint8_t su8AutoEnabledRaw = 0;
 static uint8_t su8AutoEnabledByte = 0;
 static uint32_t su32SinceLastControlled = 0;
 
-uint8_t gu8GameBrightness = 40;  // TODO: Actually make use of this
+uint8_t gu8GameBrightness = 40;
 
 static uint16_t su16ByteRawSliderOffset = 0;
 static uint8_t su8ByteRawSliderShift = 0;
@@ -23,9 +23,11 @@ typedef enum {
     SLIDER_PARSE_CHECKSUM,
 } slider_parse_state;
 
+// Hardware information for a Chunithm slider
 static const slider_cmd_Tx_hw_info sSliderHwInfo = {
     "15330   ", 0xA0, "06712", 0xFF, 0x90, 0, 0,
 };
+void Slider_Exception(uint8_t u8SliderCmd, slider_exception u8Exc);
 
 static inline void Slider_Write(uint8_t u8Byte) {
     if (u8Byte == SLIDER_SYNC || u8Byte == SLIDER_MARK) {
@@ -47,11 +49,36 @@ static void Slider_Respond(slider_cmd_Tx u8SliderCmd, const uint8_t* pu8Packet, 
 
     Slider_Write(-u8Sum);
 }
+uint8_t u8Null64[64] = { 0 };
+static void Slider_Send_Report(void) {
+    if (gbUIOpen) {
+        Slider_Respond(SLIDER_CMD_Tx_REPORT, u8Null64, sizeof gu8GroundData);
+    } else {
+        Slider_Respond(SLIDER_CMD_Tx_REPORT, gu8GroundData, sizeof gu8GroundData);
+    }
+}
+static void Slider_Send_Report_Raw(void) {
+    if (gbUIOpen) {
+        Slider_Respond(SLIDER_CMD_Tx_RAW, u8Null64, sizeof gu16PSoCDiff);
+    } else {
+        Slider_Respond(SLIDER_CMD_Tx_RAW, (void*)gu16PSoCDiff, sizeof gu16PSoCDiff);
+    }
+}
+static void Slider_Send_Report_Byte(void) {
+    slider_cmd_Tx_raw buffer;
+    for (uint8_t i = 0; i < 32; i++) {
+        if (gbUIOpen) {
+            buffer.u16Raw[i] = 0;
+        } else {
+            buffer.u16Raw[i] = (gu16PSoCDiff[i] >> su8ByteRawSliderShift) - su16ByteRawSliderOffset;
+        }
+    }
+    Slider_Respond(SLIDER_CMD_Tx_RAW, (void*)&buffer, sizeof buffer);
+}
 static void Slider_Process(slider_cmd_Rx u8SliderCmd, uint8_t* pu8Packet, uint8_t u8NPacket) {
     switch (u8SliderCmd) {
         case SLIDER_CMD_Rx_RESET:
             // These three weren't present previously, but PSoC firmware suggests they should be
-            // TODO: Validate this against the game!
             su8AutoEnabled = 0;
             su8AutoEnabledRaw = 0;
             su8AutoEnabledByte = 0;
@@ -92,7 +119,7 @@ static void Slider_Process(slider_cmd_Rx u8SliderCmd, uint8_t* pu8Packet, uint8_
 
                 gbLedDataIsControlledExt = 1;
                 su32SinceLastControlled = 0;
-                memcpy(gu8aControlledExtLedData, &((slider_cmd_Rx_led*)pu8Packet)->aBRG, 3 * 32);
+                memcpy(gaControlledExtLedData, &((slider_cmd_Rx_led*)pu8Packet)->aBRG, 3 * 32);
             }
             // Reprocess this packet as a report request where applicable
             if (u8SliderCmd == SLIDER_CMD_Rx_REPORT_PING_PONG) {
@@ -105,13 +132,13 @@ static void Slider_Process(slider_cmd_Rx u8SliderCmd, uint8_t* pu8Packet, uint8_
             return;
 
         case SLIDER_CMD_Rx_REPORT:
-            Slider_Respond(SLIDER_CMD_Tx_REPORT, gu8GroundData, sizeof gu8GroundData);
+            Slider_Send_Report();
             return;
         case SLIDER_CMD_Rx_RAW:
-            // TODO:
+            Slider_Send_Report_Raw();
             return;
         case SLIDER_CMD_Rx_BRAW:
-            // TODO:
+            Slider_Send_Report_Byte();
             return;
 
         case SLIDER_CMD_Rx_REPORT_ENABLE:
@@ -143,6 +170,92 @@ static void Slider_Process(slider_cmd_Rx u8SliderCmd, uint8_t* pu8Packet, uint8_
             su8ByteRawSliderShift = ((slider_cmd_Rx_braw_set_shift*)pu8Packet)->u8Shift;
             Slider_Respond(SLIDER_CMD_Tx_BRAW_SET_SHIFT, NULL, 0);
             return;
+
+        case SLIDER_CMD_Rx_DEBUG:
+            uint8_t u8aData[32];
+
+            switch ((slider_debug_cmd_Rx)pu8Packet[0]) {
+                case SLIDER_DEBUG_CMD_Rx_GET_FINGER_CAP:
+                    uint16_t u16FingerCap = PSoC_GetFingerCapacitance();
+                    Slider_Respond(SLIDER_CMD_Tx_DEBUG, (uint8_t*)&u16FingerCap,
+                                   sizeof u16FingerCap);
+                    break;
+                case SLIDER_DEBUG_CMD_Rx_TRACE_RESET:
+                    // TODO: Broken. Blocks forever.
+                    PSoC_SetDebug(PSoC_DebugFlag_TraceReset, 1);
+                    Slider_Respond(SLIDER_CMD_Tx_DEBUG, NULL, 0);
+                    break;
+                case SLIDER_DEBUG_CMD_Rx_GET_LAST_CS_START:
+                    Slider_Respond(SLIDER_CMD_Tx_DEBUG, (uint8_t*)&gu32LastCapSenseStart,
+                                   sizeof gu32LastCapSenseStart);
+                    break;
+                case SLIDER_DEBUG_CMD_Rx_GET_LAST_CS_END:
+                    Slider_Respond(SLIDER_CMD_Tx_DEBUG, (uint8_t*)&gu32LastCapSenseEnd,
+                                   sizeof gu32LastCapSenseEnd);
+                    break;
+
+                case SLIDER_DEBUG_CMD_Rx_PSoC_REQUEST_DEBUG:
+                    if (u8NPacket == 2) {
+                        PSoC_GetDebug(pu8Packet[1], u8aData);
+                    }
+                    Slider_Respond(SLIDER_CMD_Tx_DEBUG, u8aData, sizeof u8aData);
+                    break;
+
+                case SLIDER_DEBUG_CMD_Rx_HOST_FMC_READ:
+                    if (u8NPacket == 5) {
+                        // We can't use a cast to uint32_t* because of unaligned reads!
+                        uint32_t u32Base = pu8Packet[1];
+                        u32Base |= pu8Packet[2] << 8;
+                        u32Base |= pu8Packet[3] << 16;
+                        u32Base |= pu8Packet[4] << 24;
+                        memset(u8aData, 0xFF, sizeof u8aData);
+                        FMC_Open();
+                        FMC_ReadData(u32Base, u32Base + sizeof u8aData, (void*)u8aData);
+                        FMC_Close();
+                    }
+                    Slider_Respond(SLIDER_CMD_Tx_DEBUG, u8aData, sizeof u8aData);
+                    break;
+                case SLIDER_DEBUG_CMD_Rx_LED_FMC_READ:
+                    uint32_t u32Data = 0xFFFFFFFF;
+                    if (u8NPacket == 5) {
+                        uint32_t u32Offset = pu8Packet[1];
+                        u32Offset |= pu8Packet[2] << 8;
+                        u32Offset |= pu8Packet[3] << 16;
+                        u32Offset |= pu8Packet[4] << 24;
+
+                        LED_FMC_Read(u32Offset, &u32Data);
+                    }
+                    Slider_Respond(SLIDER_CMD_Tx_DEBUG, (uint8_t*)&u32Data, sizeof u32Data);
+                    break;
+
+                case SLIDER_DEBUG_CMD_Rx_HOST_ENTER_LDROM:
+                    SYS_EnterLDROM();
+                    break;
+                case SLIDER_DEBUG_CMD_Rx_LED_ENTER_LDROM:
+                    gu8LEDTx[0] = LED_CMD_FMC_ENTER_LDROM;
+                    // The LED firmware checks every 10ms or so
+                    CLK_SysTickLongDelay(15 ms);
+                    SYS_WaitBootloaderLED();
+                    break;
+                case SLIDER_DEBUG_CMD_Rx_LED_CHECK:
+                    Slider_Respond(SLIDER_CMD_Tx_DEBUG, (uint8_t*)&gbLedIsCustom,
+                                   sizeof gbLedIsCustom);
+                    break;
+
+                case SLIDER_DEBUG_CMD_Rx_LED_GET_DIGITAL:
+                    Slider_Respond(SLIDER_CMD_Tx_DEBUG, &gu8DigitalButtons,
+                                   sizeof gu8DigitalButtons);
+                    break;
+
+                default:
+                    Slider_Exception(u8SliderCmd, SLIDER_EXCEPTION_BUS_ERROR);
+                    break;
+            }
+            return;
+
+        default:
+            Slider_Exception(u8SliderCmd, SLIDER_EXCEPTION_BUS_ERROR);
+            break;
     }
 }
 void Slider_Exception(uint8_t u8SliderCmd, slider_exception u8Exc) {
@@ -233,13 +346,37 @@ void Slider_Tick1ms() {
         if (++su32SinceLastControlled == 5 * 1000) gbLedDataIsControlledExt = 0;
     }
 
-    if (su8AutoEnabled) {
-        static uint8_t u8Counter = 0;
-        // Only actually send an update every 8ms
-        if (++u8Counter != 8) return;
+    static uint16_t u16Counter = 0;
+    /**
+     * I haven't totally tracked down the source of the interval timer on a real slider.
+     * That said, from measurement it's 15.365ms or so. The exact time will be based on
+     * a counter from one of the low speed clocks.
+     *
+     * The game makes calls to ReadFile on an 8ms interval, but this isn't the most stable.
+     * I took a short capture, and my intervals were:
+     *
+     *   0% | 3.6ms
+     *  10% | 7.0ms
+     *  50% | 8.0ms
+     *  90% | 9.0ms
+     * 100% | 14.0ms
+     *
+     * This +-1ms appears to be caused by the use of Sleep() to regulate the interval, which
+     * has an argument precision of 1ms (and an overall precision far worse!).
+     *
+     * Chunithm will retry a read four times, at which point it considers the slider to have
+     * timed out (error 3100).
+     *
+     * Based on this, we should be safe to indeed run at a 15ms interval here.
+     *
+     * I received one report of a user getting a 3100 when they started the game. I am current
+     * working on the basis that this is a one-off, however this will need re-addressed if this
+     * issue becomes widespread.
+     */
+    if (++u16Counter != 15) return;
+    u16Counter = 0;
 
-        u8Counter = 0;
-
-        Slider_Respond(SLIDER_CMD_Tx_REPORT, gu8GroundData, sizeof gu8GroundData);
-    }
+    if (su8AutoEnabled) Slider_Send_Report();
+    if (su8AutoEnabledRaw) Slider_Send_Report_Raw();
+    if (su8AutoEnabledByte) Slider_Send_Report_Byte();
 }

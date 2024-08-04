@@ -1,15 +1,26 @@
 #include "tasoller.h"
 
-uint8_t volatile g_u8Suspend = 0;
+uint8_t volatile g_u8UsbState = 0;
+uint8_t volatile gu8VComDTEPresent = 0;
 uint8_t g_u8Idle = 0;
 uint8_t g_u8Protocol = 0;
 
 uint8_t gHidSetReport[64];
 
 STR_VCOM_LINE_CODING gLineCoding = { 0, 0, 0, 0 };
-uint16_t gCtrlSignal;
 
 uint32_t volatile g_u32OutToggle = 0;
+
+#define STALL_CONTROL               \
+    do {                            \
+        USBD_SetStall(EP_CTRL_IN);  \
+        USBD_SetStall(EP_CTRL_OUT); \
+    } while (0)
+#define CONTROL_IN_DONE                      \
+    do {                                     \
+        USBD_SET_DATA1(EP_CTRL_IN);          \
+        USBD_SET_PAYLOAD_LEN(EP_CTRL_IN, 0); \
+    } while (0)
 
 void USBD_IRQHandler(void) {
     uint32_t u32IntSts = USBD_GET_INT_FLAG();
@@ -21,8 +32,10 @@ void USBD_IRQHandler(void) {
 
         if (USBD_IS_ATTACHED()) {
             USBD_ENABLE_USB();
+            g_u8UsbState &= ~USB_STATE_FLOATING;
         } else {
             USBD_DISABLE_USB();
+            g_u8UsbState |= USB_STATE_FLOATING;
         }
     }
 
@@ -38,17 +51,15 @@ void USBD_IRQHandler(void) {
             USBD_ENABLE_USB();
             Tas_USBD_SwReset();
             g_u32OutToggle = 0;
-            g_u8Suspend = 0;
+            g_u8UsbState &= ~USB_STATE_SUSPEND;
         }
         if (u32State & USBD_STATE_SUSPEND) {
-            // Enter power down to wait USB attached; enable USB but disable PHY
-            g_u8Suspend = 1;
             USBD_DISABLE_PHY();
+            g_u8UsbState |= USB_STATE_SUSPEND;
         }
         if (u32State & USBD_STATE_RESUME) {
-            // Enable USB and enable PHY
             USBD_ENABLE_USB();
-            g_u8Suspend = 0;
+            g_u8UsbState &= ~USB_STATE_SUSPEND;
         }
     }
 
@@ -173,30 +184,28 @@ void Tas_USBD_ClassRequest(void) {
 
             default:
                 // Setup error, stall the device
-                USBD_SetStall(EP_CTRL_IN);
-                USBD_SetStall(EP_CTRL_OUT);
+                STALL_CONTROL;
                 break;
         }
     } else {
         // Host to device
         switch (setup.bRequest) {
             case SET_CONTROL_LINE_STATE:
-                // TODO: Use bit[0] (DTR) to identify connection state
-                // Is RTS worth using?
-                if (setup.wIndex == USBD_ITF_CDC_CMD) gCtrlSignal = setup.wValue;
-
-                // Status stage
-                USBD_SET_DATA1(EP_CTRL_IN);
-                USBD_SET_PAYLOAD_LEN(EP_CTRL_IN, 0);
+                if (setup.wIndex == USBD_ITF_CDC_CMD) {
+                    gu8VComDTEPresent = setup.wValue & 1;
+                    CONTROL_IN_DONE;
+                } else {
+                    STALL_CONTROL;
+                }
                 break;
 
             case SET_LINE_CODING:
-                if (setup.setLineCoding.wInterface == USBD_ITF_CDC_CMD)
+                if (setup.setLineCoding.wInterface == USBD_ITF_CDC_CMD) {
                     Tas_USBD_PrepareCtrlOut(&gLineCoding, sizeof gLineCoding, NULL);
-
-                // Status stage
-                USBD_SET_DATA1(EP_CTRL_IN);
-                USBD_SET_PAYLOAD_LEN(EP_CTRL_IN, 0);
+                    CONTROL_IN_DONE;
+                } else {
+                    STALL_CONTROL;
+                }
                 break;
 
             case SET_REPORT:
@@ -216,22 +225,17 @@ void Tas_USBD_ClassRequest(void) {
                     // // Status stage
                     // Tas_USBD_PrepareCtrlIn(NULL, 0);
                 }
-                USBD_SET_DATA1(EP_CTRL_IN);
-                USBD_SET_PAYLOAD_LEN(EP_CTRL_IN, 0);
+                CONTROL_IN_DONE;
                 break;
 
             case SET_IDLE:
                 g_u8Idle = setup.hidSetIdle.bDuration;
-                // Status stage
-                USBD_SET_DATA1(EP_CTRL_IN);
-                USBD_SET_PAYLOAD_LEN(EP_CTRL_IN, 0);
+                CONTROL_IN_DONE;
                 break;
 
             case SET_PROTOCOL:
                 g_u8Protocol = setup.hidSetProtocol.wProtocol;
-                // Status stage
-                USBD_SET_DATA1(EP_CTRL_IN);
-                USBD_SET_PAYLOAD_LEN(EP_CTRL_IN, 0);
+                CONTROL_IN_DONE;
                 break;
 
             default:
