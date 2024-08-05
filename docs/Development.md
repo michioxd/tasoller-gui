@@ -74,6 +74,6 @@ xHSETT can be used to directly control the USB device, such as sending SUSPEND s
 ## Airs
 See https://www.shinkoh-elecs.jp/wp-content/uploads/2024/05/C_KB1281_1581_24A.pdf
 
-The loop of wire between the two wings is for connecting emitter pin 3 to detector pin 1.
+The loop of wire between the two towers is for connecting emitter pin 3 to detector pin 1.
 
 The right bottom is an emitter, and then it alternates up from there.
