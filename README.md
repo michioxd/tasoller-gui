@@ -44,39 +44,26 @@ Pre-chusan Chunithm uses IO3. This firmware does not (and unfortunately cannot) 
 Tap FN1 to insert a coin. FN2 is currently unbound.
 
 ### Configuration
-Hold FN1 for configuration:
+While holding FN1, the following configuration options are available:
 
-- Pad 1/2 (cell 0): Left tower colour
-- Pad 3/4 (cell 1): Ground colour
-- Pad 5/6 (cell 2): Ground colour when pressed, and separator colour
-- Pad 7/8 (cell 3): Right tower colour
-- Pad 9/10 (cell 4): No function
-- Pad 11/12 (cell 5): Toggle rainbow effect on/off
-- Pad 13/14 (cell 6): Increase/decrease ground brightness
-- Pad 15/16 (cell 7): Increase/decrease tower brightness
-- Pad 17/18 (cell 8): No function
-- Pad 19/20 (cell 9): System volume up/down
-- Pad 21/22 (cell 10): Holds Enter for 5 seconds (insert Aime card)
-- Pad 23/24 (cell 11): No function
-- Pad 25/26 (cell 12): Increase/decrease sensitivity
-- Pad 27/28 (cell 13): No function
-- Pad 29/30 (cell 14): No function
-- Pad 31/32 (cell 15): Toggle HID keyboard mode
+![](./docs/Graphic_Slider_Settings.png)
+
+※ "Insert card" will hold the Enter key for 5 seconds
 
 ### Test menu
+
 To enter the system test menu, double-tap FN2. This will mirror the on-screen controls, and additionally adds controls for the TEST and SERVICE buttons on a real cabinet. Double-tap FN2 again to leave this mode on the controller (note that this is not synced with the game exiting the menu!).
 
-Cell 6 and 7 are the TEST button, and cell 8 and 9 are the SERVICE button.
+![](./docs/Graphic_Slider_Test.png)
 
 To access the TEST and SERVICE buttons without entering the test menu, hold FN2 instead.
+
+![](./docs/Graphic_Slider_TestReduced.png)
 
 ## Keyboard Mapping
 When the HID keyboard is enabled, the following mapping (UMIGURI defaults) is used:
 
-```
-I8U7Y6T5R4E3W2Q1
-9KMJNHBGVFCDXSZA
-```
+![](./docs/Graphic_Slider_Binds.png)
 
 with the airs mapped as `0OLP,.`.
 

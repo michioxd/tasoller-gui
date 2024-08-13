@@ -85,7 +85,7 @@ _main_init:
 
 Note that our custom firmware is compiled using GCC rather than ARMC5. Our linkerscript is not configured to place any initialisation code after the vectors, and as such this protection mechanism would be likely to cause random crashes rather than a complete inability to execute the firmware.
 
-Rather than implement this as a post-processing step after compiling firmware, our linkerscript is configured to pad C0~CF with nulls.
+Rather than implement this as a post-processing step after compiling firmware, our linkerscript is configured to place the compile timestamp within this region, and we account for the DRM modifications when comparing timestamps.
 
 ## LED DRM
 ### Magic number
@@ -120,4 +120,4 @@ The following bytes in the uploaded firmware are modified before writing them to
 | `C1`   | `FF`      |
 | `C2`   | `FF`      |
 
-The disassembly at these offsets is the same as with the host APROM. Likewise, we opt to bypass this protection by inserting null bytes.
+The disassembly at these offsets is the same as with the host APROM. Likewise, we opt to bypass this protection by placing the compile timestamp in this region.
