@@ -76,12 +76,12 @@ Stock firmware implements two commands. `A5` is a basic LED write based on a num
 
 `u8LedSpecial` enumeration:
 - `0x00`: Normal operation (all other values ignore ground data)
-- `0x01`: [Stock] Uses colours. Bar 1 full (from right)
-- `0x02`: [Stock] Uses colours. Bar 2 full (from right)
-- `0x03`: [Stock] Uses colours. Bar 3 full (from right)
-- `0x04`: [Stock] Uses colours. Bar 4 full (from right)
-- `0x1X`: [Stock] All white with black gaps. X bars black (from right)
-- `0x80`: [Stock] Flashes three times
+- `0x01`: Uses colours. Bar 1 full (from right)
+- `0x02`: Uses colours. Bar 2 full (from right)
+- `0x03`: Uses colours. Bar 3 full (from right)
+- `0x04`: Uses colours. Bar 4 full (from right)
+- `0x1X`: All white with black gaps. X bars black (from right)
+- `0x80`: Flashes three times
 
 All hues are divided by 5, such that 360° = `72`
 
