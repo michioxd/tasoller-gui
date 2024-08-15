@@ -71,5 +71,6 @@
       "bold": false,
       "italic": false
     }
-  ]
+  ],
+  "python.analysis.typeCheckingMode": "basic"
 }

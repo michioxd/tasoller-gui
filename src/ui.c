@@ -1,5 +1,6 @@
 #include "tasoller.h"
 
+#define FN1_TAP_TIME 250   // ms of FN1 to enter config
 #define FN1_HOLD_TIME 250  // ms of FN1 to enter config
 #define FN2_TAP_TIME 250   // ms of FN2 to enter service/test
 #define FN2_HOLD_TIME 500  // ms of FN2 to enter service/test
@@ -16,12 +17,18 @@
 uint8_t gbUIOpen = 0;
 static uint8_t u8TestIsActive = 0;
 
-static void UI_TickSensitivity(void) {
-    for (uint8_t i = 0; i < LED_NUM_GROUND_LOGICAL; i++) {
-        gaControlledIntLedData[i].h = 0;
-        gaControlledIntLedData[i].s = (gConfig.u8Sens - 1) * 16;
-        gaControlledIntLedData[i].v = 0;
+static inline void UI_WriteRange(const uint8_t u8Start, const uint8_t u8End, const uint16_t u16H,
+                                 const uint8_t u8S, const uint8_t u8V) {
+    if (u8End < u8Start) return;
+    for (uint8_t i = u8Start; i <= u8End; i++) {
+        gaControlledIntLedData[i].h = u16H;
+        gaControlledIntLedData[i].s = u8S;
+        gaControlledIntLedData[i].v = u8V;
     }
+}
+
+static void UI_TickSensitivity(void) {
+    UI_WriteRange(0, LED_NUM_GROUND_LOGICAL - 1, 0, (gConfig.u8Sens - 1) * 16, 0);
 
     for (uint8_t i = 0; i < gConfig.u8Sens; i++) gaControlledIntLedData[i * 2].v = 255;
 
@@ -57,14 +64,10 @@ static void UI_TickSettings(void) {
         if (++u8Pulser == 255) u8PulserDir = 1;
     }
 
-    for (uint8_t i = 0; i < LED_NUM_GROUND_LOGICAL; i++) {
-        gaControlledIntLedData[i].h = 0;
-        gaControlledIntLedData[i].s = 255;
-        gaControlledIntLedData[i].v = 0;
-    }
+    UI_WriteRange(0, LED_NUM_GROUND_LOGICAL - 1, 0, 255, 0);
 
     {  // LED colour control
-        gaControlledIntLedData[LED_CELL_0].h = gConfig.u16HueWingLeft;
+        gaControlledIntLedData[LED_CELL_0].h = gConfig.u16HueTowerLeft;
         gaControlledIntLedData[LED_CELL_0].v = 255;
         gaControlledIntLedData[LED_CELL_1].h = gConfig.u16HueGround;
         gaControlledIntLedData[LED_CELL_1].v = 255;
@@ -72,17 +75,17 @@ static void UI_TickSettings(void) {
         gaControlledIntLedData[LED_DIVIDER_1_2].v = 255;
         gaControlledIntLedData[LED_CELL_2].h = gConfig.u16HueGround;
         gaControlledIntLedData[LED_CELL_2].v = 255;
-        gaControlledIntLedData[LED_CELL_3].h = gConfig.u16HueWingRight;
+        gaControlledIntLedData[LED_CELL_3].h = gConfig.u16HueTowerRight;
         gaControlledIntLedData[LED_CELL_3].v = 255;
 
-        if (gu32PSoCDigitalTrig & PAD_1_Msk) MOD_INCR(gConfig.u16HueWingLeft, LED_HUE_MAX);
-        if (gu32PSoCDigitalTrig & PAD_2_Msk) MOD_DECR(gConfig.u16HueWingLeft, LED_HUE_MAX);
+        if (gu32PSoCDigitalTrig & PAD_1_Msk) MOD_INCR(gConfig.u16HueTowerLeft, LED_HUE_MAX);
+        if (gu32PSoCDigitalTrig & PAD_2_Msk) MOD_DECR(gConfig.u16HueTowerLeft, LED_HUE_MAX);
         if (gu32PSoCDigitalTrig & PAD_3_Msk) MOD_INCR(gConfig.u16HueGround, LED_HUE_MAX);
         if (gu32PSoCDigitalTrig & PAD_4_Msk) MOD_DECR(gConfig.u16HueGround, LED_HUE_MAX);
         if (gu32PSoCDigitalTrig & PAD_5_Msk) MOD_INCR(gConfig.u16HueGroundActive, LED_HUE_MAX);
         if (gu32PSoCDigitalTrig & PAD_6_Msk) MOD_DECR(gConfig.u16HueGroundActive, LED_HUE_MAX);
-        if (gu32PSoCDigitalTrig & PAD_7_Msk) MOD_INCR(gConfig.u16HueWingRight, LED_HUE_MAX);
-        if (gu32PSoCDigitalTrig & PAD_8_Msk) MOD_DECR(gConfig.u16HueWingRight, LED_HUE_MAX);
+        if (gu32PSoCDigitalTrig & PAD_7_Msk) MOD_INCR(gConfig.u16HueTowerRight, LED_HUE_MAX);
+        if (gu32PSoCDigitalTrig & PAD_8_Msk) MOD_DECR(gConfig.u16HueTowerRight, LED_HUE_MAX);
     }
     // [Cell 4 no function]
     {  // Lighting toggles
@@ -105,17 +108,17 @@ static void UI_TickSettings(void) {
         } else {
             gaControlledIntLedData[LED_CELL_6].v = 255;
         }
-        if (gConfig.u8LedWingBrightness) {
+        if (gConfig.u8LedTowerBrightness) {
             gaControlledIntLedData[LED_CELL_7].s = 0;
-            gaControlledIntLedData[LED_CELL_7].v = gConfig.u8LedWingBrightness;
+            gaControlledIntLedData[LED_CELL_7].v = gConfig.u8LedTowerBrightness;
         } else {
             gaControlledIntLedData[LED_CELL_7].v = 255;
         }
 
         if (gu32PSoCDigitalTrig & PAD_13_Msk) INCR(gConfig.u8LedGroundBrightness, 255);
         if (gu32PSoCDigitalTrig & PAD_14_Msk) DECR(gConfig.u8LedGroundBrightness, 0);
-        if (gu32PSoCDigitalTrig & PAD_15_Msk) INCR(gConfig.u8LedWingBrightness, 255);
-        if (gu32PSoCDigitalTrig & PAD_16_Msk) DECR(gConfig.u8LedWingBrightness, 0);
+        if (gu32PSoCDigitalTrig & PAD_15_Msk) INCR(gConfig.u8LedTowerBrightness, 255);
+        if (gu32PSoCDigitalTrig & PAD_16_Msk) DECR(gConfig.u8LedTowerBrightness, 0);
     }
     // [Cell 8 no function]
 
@@ -162,11 +165,7 @@ static uint32_t su32EnteredTestMenuAt = 0;
 static void UI_TickServiceTest(void) {
     uint8_t u8V = 0;
     // Zero out the LED data
-    for (uint8_t i = 0; i < LED_NUM_GROUND_LOGICAL; i++) {
-        gaControlledIntLedData[i].h = 0;
-        gaControlledIntLedData[i].s = 0;
-        gaControlledIntLedData[i].v = 0;
-    }
+    UI_WriteRange(0, LED_NUM_GROUND_LOGICAL - 1, 0, 0, 0);
 
     uint8_t u8ForceTest = 0;
     if (u8TestIsActive) {
@@ -183,11 +182,8 @@ static void UI_TickServiceTest(void) {
             } else {
                 u8V = 50;
             }
-            gaControlledIntLedData[LED_CELL_0].v = u8V;
-            gaControlledIntLedData[LED_DIVIDER_0_1].v = u8V;
-            gaControlledIntLedData[LED_CELL_1].v = u8V;
-            gaControlledIntLedData[LED_DIVIDER_1_2].v = u8V;
-            gaControlledIntLedData[LED_CELL_2].v = u8V;
+
+            UI_WriteRange(LED_CELL_0, LED_CELL_2, 0, 0, u8V);
         }
         gaControlledIntLedData[LED_DIVIDER_2_3].v = 255;
         {  // Up
@@ -196,11 +192,7 @@ static void UI_TickServiceTest(void) {
             } else {
                 u8V = 50;
             }
-            gaControlledIntLedData[LED_CELL_3].v = u8V;
-            gaControlledIntLedData[LED_DIVIDER_3_4].v = u8V;
-            gaControlledIntLedData[LED_CELL_4].v = u8V;
-            gaControlledIntLedData[LED_DIVIDER_4_5].v = u8V;
-            gaControlledIntLedData[LED_CELL_5].v = u8V;
+            UI_WriteRange(LED_CELL_3, LED_CELL_5, 0, 0, u8V);
         }
         gaControlledIntLedData[LED_DIVIDER_5_6].v = 255;
 
@@ -211,11 +203,7 @@ static void UI_TickServiceTest(void) {
             } else {
                 u8V = 50;
             }
-            gaControlledIntLedData[LED_CELL_13].v = u8V;
-            gaControlledIntLedData[LED_DIVIDER_13_14].v = u8V;
-            gaControlledIntLedData[LED_CELL_14].v = u8V;
-            gaControlledIntLedData[LED_DIVIDER_14_15].v = u8V;
-            gaControlledIntLedData[LED_CELL_15].v = u8V;
+            UI_WriteRange(LED_CELL_13, LED_CELL_15, 0, 255, u8V);
         }
     }
 
@@ -250,34 +238,54 @@ static void UI_TickServiceTest(void) {
     gaControlledIntLedData[LED_DIVIDER_9_10].v = 255;
 }
 
+static uint8_t u8Fn1Held = 0;
+static inline void _UI_SettingsOnExit(void) {
+    // If FN2 was released while still in sensitivity adjustment, make sure the changes save
+    if (su8SensTimeout) {
+        PSoC_SetFingerCapacitanceFromConfig(1);
+        su8SensTimeout = 0;
+    }
+
+    bConfigDirty = 1;
+
+    u16RequestedConsumerControl = 0;
+    u32EnterPressStarted = 0;
+}
+
 void UI_Tick(void) {
+    static uint8_t u8LastDB = 0;
+    const uint8_t u8PosDb = gu8DigitalButtons & (~u8LastDB);
+
+    static uint8_t u8ConfigIsActive = 0;
+
+    // Handle double tap trigger on FN1
+    static uint32_t u32LastFn1 = 0;
+    if (u8PosDb & DIGITAL_FN1_Msk) {
+        if (u32LastFn1 && MS_SINCE(u32LastFn1) < FN1_TAP_TIME) {
+            u8ConfigIsActive = !u8ConfigIsActive;
+
+            if (!u8ConfigIsActive) {
+                _UI_SettingsOnExit();
+            }
+        }
+        u32LastFn1 = gu32NowMs;
+    }
+
     // Handle hold trigger on FN1
-    static uint8_t u8Fn1Held = 0;
     if (gu8DigitalButtons & DIGITAL_FN1_Msk) {
         if (u8Fn1Held < FN1_HOLD_TIME) u8Fn1Held++;
     } else {
         // We released the button after holding it for long enough to be in the configuration UI, so
         // assume something changed
         if (u8Fn1Held >= FN1_HOLD_TIME) {
-            // If FN2 was released while still in sensitivity adjustment, make sure the changes save
-            if (su8SensTimeout) {
-                PSoC_SetFingerCapacitanceFromConfig(1);
-                su8SensTimeout = 0;
-            }
-
-            bConfigDirty = 1;
+            _UI_SettingsOnExit();
         }
-
-        u16RequestedConsumerControl = 0;
-        u32EnterPressStarted = 0;
         u8Fn1Held = 0;
     }
 
     // Handle double tap trigger on FN2
     static uint32_t u32LastFn2 = 0;
-    static uint8_t u8LastDB = 0;
-    const uint8_t u8PostDb = gu8DigitalButtons & (~u8LastDB);
-    if (u8PostDb & DIGITAL_FN2_Msk) {
+    if (u8PosDb & DIGITAL_FN2_Msk) {
         if (u32LastFn2 && MS_SINCE(u32LastFn2) < FN2_TAP_TIME) {
             u8TestIsActive = !u8TestIsActive;
 
@@ -291,7 +299,6 @@ void UI_Tick(void) {
         }
         u32LastFn2 = gu32NowMs;
     }
-    u8LastDB = gu8DigitalButtons;
 
     // Handle hold trigger on FN2
     static uint16_t u16Fn2Held = 0;
@@ -301,8 +308,11 @@ void UI_Tick(void) {
         u16Fn2Held = 0;
     }
 
+    // Persistent state
+    u8LastDB = gu8DigitalButtons;
+
     // Render the appropriate UI based on what's being done
-    if (u8Fn1Held >= FN1_HOLD_TIME) {
+    if (u8Fn1Held >= FN1_HOLD_TIME || u8ConfigIsActive) {
         gbLedDataIsControlledInt = 1;
         gbUIOpen = 1;
         UI_TickSettings();

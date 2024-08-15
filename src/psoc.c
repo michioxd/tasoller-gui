@@ -6,6 +6,9 @@
 // #pragma GCC push_options
 // #pragma GCC optimize ("O0")
 
+// TODO: Anything higher than O1 is breaking this code. Probably something hasn't been marked as
+// volatile that should be!
+
 uint16_t gu16PSoCDiff[32] = { 0 };
 // Touch threshold as calculated by SmartSense. Has hysteresis built in.
 // 0 is an insane default, so instead we default to 100 which is far less likely to break things :)
@@ -27,9 +30,10 @@ uint32_t gu32LastCapSenseStart = 0;
 uint32_t gu32LastCapSenseEnd = 0;
 
 volatile uint8_t bPSoCDirtyVolatile = 0;
+volatile uint8_t bPSoCAliveVolatile = 0;
 volatile uint8_t bForceSliderSend = 0;
 
-static void* pu8PsocRxDestination = NULL;
+static volatile void* pu8PsocRxDestination = NULL;
 static uint8_t pu8PsocRxDestinationLen = 0;
 static volatile uint8_t* volatile pu8PsocGotData = NULL;
 static volatile PSoC_CMD_RX eBlockingCommand = _PSoC_CMD_RX_NONE;
@@ -41,9 +45,8 @@ static void PSoC_HandleRx(PSoC_CMD_RX eCmd, uint8_t u8Len, uint8_t* u8Data) {
     }
 
     switch (eCmd) {
-        case PSoC_CMD_RX_REQUEST_FINGER_CAP:
-            // We're in the IRQ here, so don't block on this!
-            PSoC_SetFingerCapacitanceFromConfig(0);
+        case PSoC_CMD_RX_INITIALISATION_COMPLETE:
+            bPSoCAliveVolatile = 1;
             return;
 
         // Debug traces
@@ -64,6 +67,7 @@ static void PSoC_HandleRx(PSoC_CMD_RX eCmd, uint8_t u8Len, uint8_t* u8Data) {
                 gu16PSoCDiff[16 + i] |= u8Data[(i * 2) + 1];
             }
             bPSoCDirtyVolatile = 1;
+            bPSoCAliveVolatile = 1;
             return;
 
         case PSoC_CMD_RX_MASTER_DIFF:
@@ -76,6 +80,7 @@ static void PSoC_HandleRx(PSoC_CMD_RX eCmd, uint8_t u8Len, uint8_t* u8Data) {
                 gu16PSoCDiff[i] |= u8Data[(i * 2) + 1];
             }
             bPSoCDirtyVolatile = 1;
+            bPSoCAliveVolatile = 1;
             return;
 
         // Arbitrary data reception
@@ -112,7 +117,7 @@ static void PSoC_HandleRx(PSoC_CMD_RX eCmd, uint8_t u8Len, uint8_t* u8Data) {
 
             if (pu8PsocRxDestination) {
                 if (u8Len > pu8PsocRxDestinationLen) u8Len = pu8PsocRxDestinationLen;
-                memcpy(pu8PsocRxDestination, u8Data, u8Len);
+                memcpy((void*)pu8PsocRxDestination, u8Data, u8Len);
                 // Make sure we don't go clobbering stuff later!
                 pu8PsocRxDestination = NULL;
             }
@@ -164,9 +169,12 @@ static uint8_t PSoC_Valid_Len(PSoC_CMD_RX eCmd, uint8_t u8Len) {
             // We should never be seeing a length for these!
             return 0;
 
+        // TODO: This doesn't seem to be a packet!
+        case PSoC_CMD_RX_INITIALISATION_COMPLETE:
+            return 0;
+
         // Commands that have a payload we need to receive
         case PSoC_CMD_RX_SET_FINGER_CAP:
-        case PSoC_CMD_RX_REQUEST_FINGER_CAP:
         case PSoC_CMD_RX_ENABLE_DEBUG:
             return u8Len == 2;
         case PSoC_CMD_RX_MASTER_DIFF:
@@ -221,10 +229,12 @@ void UART1_IRQHandler(void) {
                 case PSoC_CMD_RX_CS_END:
                     // PSoC_HandleRx(u8Data, 0, NULL);
                     return;
+                case PSoC_CMD_RX_INITIALISATION_COMPLETE:
+                    PSoC_HandleRx(u8Data, 0, NULL);
+                    return;
 
                 // Commands that have a payload we need to receive
                 case PSoC_CMD_RX_SET_FINGER_CAP:
-                case PSoC_CMD_RX_REQUEST_FINGER_CAP:
                 case PSoC_CMD_RX_MASTER_DIFF:
                 case PSoC_CMD_RX_SLAVE_DIFF:
                 case PSoC_CMD_RX_MASTER_TOUCH_TH:
@@ -325,8 +335,7 @@ static inline void PSoC_Cmd(PSoC_CMD_TX eCmd, uint8_t u8D0, uint8_t u8D1, PSoC_C
 }
 
 uint16_t PSoC_GetFingerCapacitance(void) {
-    uint16_t u16FingerCap;
-
+    static volatile uint16_t u16FingerCap = 0;
     pu8PsocRxDestination = &u16FingerCap;
     pu8PsocRxDestinationLen = sizeof u16FingerCap;
     PSoC_Cmd(PSoC_CMD_TX_GET_FINGER_CAP, 0, 0, PSoC_CMD_RX_GET_FINGER_CAP);

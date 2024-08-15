@@ -14,6 +14,9 @@ extern uint8_t gbUIOpen;
 
 #define BYTESWAP_U16(x) ((((x) & 0xFF) << 8) | ((x) >> 8))
 
+// === Touch input ===
+// #define ENABLE_TOUCH_INPUT
+
 // === DAO-DRM ===
 // * For now the bootloader check is being left enabled.
 // * It'll help catch if I break that in my bootloader :P

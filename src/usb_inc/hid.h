@@ -1341,6 +1341,12 @@
 #define HID_USAGE_BARREL_SWITCH        1, 0x44
 #define HID_USAGE_ERASER               1, 0x45
 #define HID_USAGE_TABLET_PICK          1, 0x46
+#define HID_USAGE_CONFIDENCE           1, 0x47
+#define HID_USAGE_WIDTH                1, 0x48
+#define HID_USAGE_HEIGHT               1, 0x49
+#define HID_USAGE_CONTACT_IDENTIFIER   1, 0x51
+#define HID_USAGE_CONTACT_COUNT        1, 0x54
+#define HID_USAGE_SCAN_TIME            1, 0x56
 
 /* Alphanumeric Display Usages */
 #define HID_USAGE_ALPHANUMERIC_DISPLAY 1, 0x01

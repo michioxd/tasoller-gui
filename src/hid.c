@@ -129,10 +129,140 @@ static uint8_t _HID_Enter_Tick(void) {
     return 1;
 }
 
+#ifdef ENABLE_TOUCH_INPUT
+enum {
+    u8MaxFingers = (sizeof((hid_touch_report_t *)(0))->sFinger) /
+                   (sizeof((hid_touch_report_t *)(0))->sFinger[0])
+};
+#define OVERLAP(start1, end1, start2, end2) (Minimum((end2), (end1)) >= Maximum((start1), (start2)))
+typedef struct {
+    uint8_t bActive;
+    uint8_t u8Start;
+    uint8_t u8End;
+
+    uint8_t u8FakeCentreX;
+    uint8_t u8FakeCentreY;
+} tracked_finger_t;
+tracked_finger_t trackedFingers[u8MaxFingers] = { 0 };
+
+#define SCREEN_HEIGHT 127
+#define SCREEN_WIDTH 128
+// Definition for Sonolus on my Pixel 6
+// #define LEFT_EDGE 28
+// #define RIGHT_EDGE 20
+// Definition for PJSK on my Pixel 6
+// #define LEFT_EDGE 22
+// #define RIGHT_EDGE 20
+#define LEFT_EDGE 0
+#define RIGHT_EDGE 0
+
+#define VERTICAL_MOVEMENT 10
+
+#define SCREEN_Y (SCREEN_HEIGHT / 5)
+#define TOUCH_WIDTH ((SCREEN_WIDTH - LEFT_EDGE - RIGHT_EDGE) / 16)
+
+static void _TrackTouches(void) {
+    static tracked_finger_t newFingers[u8MaxFingers];
+    memset(newFingers, 0, sizeof newFingers);
+
+    uint8_t nFingers = 0;
+    int8_t iStart = -1;
+
+    static struct {
+        uint16_t u16Bias;
+        uint8_t u8Pos;
+    } sBiasCalc[16] = { 0 };
+    uint16_t u16BiasTop = 0;
+    uint16_t u16BiasBottom = 0;
+
+    // Identify our currently active fingers
+    for (uint8_t x = 0; x <= 16; x++) {
+        if ((x < 16) && gu16PSoCDigital & (1 << x)) {
+            if (iStart == -1) {
+                u16BiasTop = 0;
+                u16BiasBottom = 0;
+                iStart = x;
+            }
+
+            // Position = [LEFT_EDGE, {scale based on X} , RIGHT_EDGE] = SCREEN_WIDTH
+            // Virtual width = SCREEN_WIDTH - LEFT_EDGE - RIGHT_EDGE
+
+            // L + ((W-L-R)  * (16 - x)) / 16)
+
+            // TODO: Might need -1 here not +1
+            sBiasCalc[x - iStart].u8Pos = LEFT_EDGE + ((SCREEN_WIDTH - LEFT_EDGE - RIGHT_EDGE) * (32 - (x * 2 + 1))) / 32;
+            // sBiasCalc[x - iStart].u8Pos -=
+            //     (LEFT_EDGE + ((16 - x) * TOUCH_WIDTH) - (TOUCH_WIDTH / 2));
+            sBiasCalc[x - iStart].u16Bias = gu8GroundData[x * 2] + gu8GroundData[x * 2 + 1];
+
+            u16BiasTop += gu8GroundData[x * 2];
+            u16BiasBottom += gu8GroundData[x * 2 + 1];
+        } else {
+            if (iStart != -1) {
+                newFingers[nFingers].bActive = 1;
+                newFingers[nFingers].u8Start = iStart;
+                newFingers[nFingers].u8End = x - 1;
+
+                uint32_t u32TotalWeight = 0;
+                uint64_t u64Biased = 0;
+                for (uint8_t i = 0; i < x - iStart; i++) {
+                    u32TotalWeight += (uint32_t)sBiasCalc[i].u16Bias;
+                    u64Biased += (uint64_t)sBiasCalc[i].u8Pos * (uint64_t)sBiasCalc[i].u16Bias;
+                }
+                newFingers[nFingers].u8FakeCentreX = u64Biased / u32TotalWeight;
+                newFingers[nFingers].u8FakeCentreY = (u16BiasTop * VERTICAL_MOVEMENT) / (u16BiasTop + u16BiasBottom);
+
+                nFingers++;
+                iStart = -1;
+            }
+        }
+        if (nFingers >= u8MaxFingers) break;
+    }
+
+    memcpy(trackedFingers, newFingers, sizeof newFingers);
+}
+static uint8_t _HID_Touch_Tick(void) {
+    hid_touch_report_t *buf = (hid_touch_report_t *)HID_MISC_BUF;
+
+    memset(buf, 0, sizeof *buf);
+    buf->bReportId = HID_REPORT_ID_TOUCH;
+
+    _TrackTouches();
+
+    // When in portrait, X and Y make sense
+    // In landscape, X and Y are inverse (ie screen rotation is ignored)
+
+    uint8_t nFingers = 0;
+    for (uint8_t i = 0; i < u8MaxFingers; i++) {
+        buf->sFinger[nFingers].bTipSwitch = trackedFingers[i].bActive;
+        buf->sFinger[nFingers].bIdentifier = i;
+
+        if (trackedFingers[i].bActive) {
+            uint8_t width = (trackedFingers[i].u8End + 1) - trackedFingers[i].u8Start;
+            buf->sFinger[nFingers].bX = SCREEN_Y + trackedFingers[i].u8FakeCentreY;
+            buf->sFinger[nFingers].bY = trackedFingers[i].u8FakeCentreX;
+
+            buf->sFinger[nFingers].bW = TOUCH_WIDTH / 2;
+            buf->sFinger[nFingers].bH = width * TOUCH_WIDTH;
+        }
+
+        nFingers++;
+    }
+
+    buf->bContactCount = nFingers;
+
+    HID_MISC_SEND(buf);
+    return 0;
+}
+#endif
+
 typedef enum {
     TIMESLOT_KEYBOARD = 0,
     TIMESLOT_CONSUMER,
     TIMESLOT_ENTER,
+#ifdef ENABLE_TOUCH_INPUT
+    TIMESLOT_TOUCH,
+#endif
     _TIMESLOT_COUNT,
 } eTimeslot_t;
 static void _HID_Misc_Tick(void) {
@@ -165,6 +295,12 @@ static void _HID_Misc_Tick(void) {
             case TIMESLOT_ENTER:
                 if (_HID_Enter_Tick()) goto timeslot_used;
                 break;
+
+#ifdef ENABLE_TOUCH_INPUT
+            case TIMESLOT_TOUCH:
+                if (_HID_Touch_Tick()) goto timeslot_used;
+                break;
+#endif
 
             default:
                 break;

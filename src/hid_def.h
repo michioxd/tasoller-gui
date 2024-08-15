@@ -16,6 +16,7 @@ enum {
     HID_REPORT_ID_KEYBOARD,
     HID_REPORT_ID_CONSUMER_CONTROL,
     HID_REPORT_ID_ENTER,
+    HID_REPORT_ID_TOUCH,
     HID_REPORT_ID_IO4_CMD = 16,
 };
 
@@ -37,6 +38,40 @@ typedef struct __packed {
     uint8_t bReportId;
     uint8_t u8Keyboard[1];
 } hid_enter_report_t;
+typedef struct __packed {
+    uint8_t bReportId;
+
+    /*
+    uint8_t bTipSwitch : 1;
+    uint8_t _1_3 : 3;
+    uint8_t bInRange : 1;
+    // uint8_t bConfidence : 1;
+    uint16_t _5_11 : 11;
+    uint16_t wX;
+    uint16_t wY;
+    uint16_t wWidth;
+    uint16_t wHeight;
+    uint16_t _80_16 : 16;
+    */
+
+    // uint8_t bTipSwitch : 1;
+    // uint8_t bInRange : 1;
+    // uint8_t _2_6 : 6;
+    // uint8_t _8;
+    // uint16_t wX;
+    // uint16_t wY;
+
+    struct {
+        uint8_t bTipSwitch : 1;
+        uint8_t _1_7 : 1;
+        uint8_t bIdentifier;
+        uint8_t bX;
+        uint8_t bY;
+        uint8_t bW;
+        uint8_t bH;
+    } sFinger[8];
+    uint8_t bContactCount;
+} hid_touch_report_t;
 
 typedef struct __packed {
     uint8_t bReportId;

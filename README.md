@@ -2,16 +2,22 @@
 
 See [Development](./Development.md) for development information.
 
-Yes, the code is a mess. I just wanted to get something onto git y'know :).
+Like what you see? [Buy me a coffee](https://ko-fi.com/bottersnike)
+
+## Features
+- Superior slider processing; no more dropped holds or missed notes!
+- Native arcade IO support
+- Air sensor anti-jitter (fixes dodgy sensors)
+- Intuitive menus
+- Arcade-accurate colours
+
+And of course, it's all open source :).
 
 ## Setup
 ### Installing Firmware
-- Disconnect the PC cable from the TASOLLER
-- Hold down the FN2 button, while reconnecting the PC cable
-- `HOSTMCU` should show as a device
-- Use `Update V1.1.exe` from official firmware updates to load the firmware
-
-Currently, Dao CFW is required on the LED board. This is controlled by `LED_FIRMWARE_CFW` in `src/led.h`.
+- Download both `host_aprom.bin` and `led_aprom.bin`
+- Run `TASOLLER-FirmwareUpdater.exe`
+- Follow the instructions
 
 ### Configuring segatools
 This firmware emulates arcade IO. As such, segatools' emulation should be disabled, by adding the following lines:

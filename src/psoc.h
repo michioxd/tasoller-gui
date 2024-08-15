@@ -28,7 +28,7 @@ typedef enum : uint8_t {
     // PSoC -> Host
     PSoC_CMD_RX_MASTER_DIFF = 0xAD,
     PSoC_CMD_RX_SLAVE_DIFF = 0xAF,
-    PSoC_CMD_RX_REQUEST_FINGER_CAP = 0xC1,
+    PSoC_CMD_RX_INITIALISATION_COMPLETE = 0xC1,
 
     // PSoC -> Host (Debug)
     PSoC_CMD_RX_MASTER_TOUCH_TH = 0xAA,
@@ -59,6 +59,8 @@ extern uint16_t gu16PSoCDiff[32];
 
 // Has the difference data changed in the interrupt handler?
 extern volatile uint8_t bPSoCDirtyVolatile;
+// Have we received indication that the PSoC is ready for packets?
+extern volatile uint8_t bPSoCAliveVolatile;
 // Has the post-processed difference data changed?
 extern volatile uint8_t bForceSliderSend;
 

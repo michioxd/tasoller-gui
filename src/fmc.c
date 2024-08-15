@@ -56,14 +56,21 @@ void FMC_EEPROM_Load(void) {
 
         gConfig.u8Sens = 8;
 
-        gConfig.u16HueWingLeft = 330;
-        gConfig.u16HueWingRight = 180;
-        // TODO: These are the DJ DAO defaults, but the game looks like the hue should be 60 and 300
-        gConfig.u16HueGround = 45;
+        gConfig.u16HueTowerLeft = 330;
+        gConfig.u16HueTowerRight = 180;
+
+#ifdef LED_CORRECTION_ON_LED_MCU
+        gConfig.u16HueGround = 60;
+        gConfig.u16HueGroundActive = 300;
+#else
+        // The game uses 60° and 300°. Our red channel is approximately half as strong as the game,
+        // so by shifting 30° we get the appearance of correct colours.
+        gConfig.u16HueGround = 30;
         gConfig.u16HueGroundActive = 330;
+#endif
 
         gConfig.u8LedGroundBrightness = 255;
-        gConfig.u8LedWingBrightness = 255;
+        gConfig.u8LedTowerBrightness = 255;
 
         for (uint8_t i = 0; i < 32; i++) {
             gConfig.u16PSoCScaleMin[i] = 0;
@@ -71,6 +78,11 @@ void FMC_EEPROM_Load(void) {
         }
 
         bConfigDirty = 1;
+    }
+    // If it's an invalid value, it's probably from uninitialized flash; don't boot to the
+    // bootloader!
+    if (!(gConfig.u8NextBootLEDBootloader == 0 || gConfig.u8NextBootLEDBootloader == 1)) {
+        gConfig.u8NextBootLEDBootloader = 0;
     }
 
     FMC_Close();

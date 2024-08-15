@@ -121,7 +121,7 @@ typedef enum : uint8_t {
     SLIDER_DEBUG_CMD_Rx_LED_CHECK = 0x22,
 
     // IO Access
-    SLIDER_DEBUG_CMD_Rx_LED_GET_DIGITAL = 0x30,
+    SLIDER_DEBUG_CMD_Rx_GET_DIGITAL = 0x30,
 } slider_debug_cmd_Rx;
 typedef enum : uint8_t {
     SLIDER_CMD_Tx_REPORT = 0x01,

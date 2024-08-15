@@ -229,12 +229,14 @@ static void Slider_Process(slider_cmd_Rx u8SliderCmd, uint8_t* pu8Packet, uint8_
                     break;
 
                 case SLIDER_DEBUG_CMD_Rx_HOST_ENTER_LDROM:
+                    // Remember if we're going to want to kick the LED board into LDROM next reboot
+                    gConfig.u8NextBootLEDBootloader = pu8Packet[1];
+                    bConfigDirty = 1;
+                    FMC_EEPROM_Store();
+
                     SYS_EnterLDROM();
                     break;
                 case SLIDER_DEBUG_CMD_Rx_LED_ENTER_LDROM:
-                    gu8LEDTx[0] = LED_CMD_FMC_ENTER_LDROM;
-                    // The LED firmware checks every 10ms or so
-                    CLK_SysTickLongDelay(15 ms);
                     SYS_WaitBootloaderLED();
                     break;
                 case SLIDER_DEBUG_CMD_Rx_LED_CHECK:
@@ -242,7 +244,7 @@ static void Slider_Process(slider_cmd_Rx u8SliderCmd, uint8_t* pu8Packet, uint8_
                                    sizeof gbLedIsCustom);
                     break;
 
-                case SLIDER_DEBUG_CMD_Rx_LED_GET_DIGITAL:
+                case SLIDER_DEBUG_CMD_Rx_GET_DIGITAL:
                     Slider_Respond(SLIDER_CMD_Tx_DEBUG, &gu8DigitalButtons,
                                    sizeof gu8DigitalButtons);
                     break;
@@ -342,8 +344,8 @@ void Slider_TickSerial(void) {
 
 void Slider_Tick1ms() {
     if (gbLedDataIsControlledExt) {
-        // If we haven't had an LED packet in 5 seconds, call it quits
-        if (++su32SinceLastControlled == 5 * 1000) gbLedDataIsControlledExt = 0;
+        // If we haven't had an LED packet in 1 second, call it quits
+        if (++su32SinceLastControlled == 1000) gbLedDataIsControlledExt = 0;
     }
 
     static uint16_t u16Counter = 0;

@@ -1,41 +1,42 @@
 #include <stddef.h>
 
+#include "sys/syslimits.h"
 #include "tasoller.h"
 
+#define __
 static const uint8_t IO4_ReportDescriptor[] = {
     // Analog input (28 bytes)
     HID_USAGE_PAGE(GENERIC_DESKTOP),
     HID_USAGE(JOYSTICK),
     HID_COLLECTION(APPLICATION),
-    HID_REPORT_ID(HID_REPORT_ID_IO4),
-    HID_USAGE(POINTER),
-    HID_COLLECTION(PHYSICAL),
+    __ HID_REPORT_ID(HID_REPORT_ID_IO4),
+    __ HID_USAGE(POINTER),
+    __ HID_COLLECTION(PHYSICAL),
     // 8 ADC channels
-    HID_USAGE(X),
-    HID_USAGE(Y),
-    HID_USAGE(X),
-    HID_USAGE(Y),
-    HID_USAGE(X),
-    HID_USAGE(Y),
-    HID_USAGE(X),
-    HID_USAGE(Y),
+    __ __ HID_USAGE(X),
+    __ __ HID_USAGE(Y),
+    __ __ HID_USAGE(X),
+    __ __ HID_USAGE(Y),
+    __ __ HID_USAGE(X),
+    __ __ HID_USAGE(Y),
+    __ __ HID_USAGE(X),
+    __ __ HID_USAGE(Y),
     // 4 Rotary channels
-    HID_USAGE(RX),
-    HID_USAGE(RY),
-    HID_USAGE(RX),
-    HID_USAGE(RY),
+    __ __ HID_USAGE(RX),
+    __ __ HID_USAGE(RY),
+    __ __ HID_USAGE(RX),
+    __ __ HID_USAGE(RY),
     // 2 Coin chutes
-    HID_USAGE(SLIDER),
-    HID_USAGE(SLIDER),
-    HID_LOGICAL_MINIMUM(1, 0),
-    HID_LOGICAL_MAXIMUM(4, 65534),
-    HID_PHYSICAL_MINIMUM(1, 0),
-    HID_PHYSICAL_MAXIMUM(4, 65534),
-    HID_REPORT_COUNT(14),
-    HID_REPORT_SIZE(16),
-    HID_INPUT(DATA, VARIABLE, ABSOLUTE, NO_WRAP, LINEAR, PREFERRED_STATE, NO_NULL_POSITION),
-    HID_END_COLLECTION(PHYSICAL),
-
+    __ __ HID_USAGE(SLIDER),
+    __ __ HID_USAGE(SLIDER),
+    __ __ HID_LOGICAL_MINIMUM(1, 0),
+    __ __ HID_LOGICAL_MAXIMUM(4, 65534),
+    __ __ HID_PHYSICAL_MINIMUM(1, 0),
+    __ __ HID_PHYSICAL_MAXIMUM(4, 65534),
+    __ __ HID_REPORT_COUNT(14),
+    __ __ HID_REPORT_SIZE(16),
+    __ __ HID_INPUT(DATA, VARIABLE, ABSOLUTE, NO_WRAP, LINEAR, PREFERRED_STATE, NO_NULL_POSITION),
+    __ HID_END_COLLECTION(PHYSICAL),
     // Digital input (6 bytes = 48 bits)
     // [ 0~15]: Player 1 buttons
     // [16~31]: Player 2 buttons
@@ -50,91 +51,142 @@ static const uint8_t IO4_ReportDescriptor[] = {
     //      -> 01h: ?
     //      -> 02h: ?
     //      -> 04h: ? (is set on timeout)
-    HID_USAGE_PAGE(SIMULATION),
-    HID_USAGE_PAGE(BUTTONS),
-    HID_USAGE_MINIMUM(1, 1),
-    HID_USAGE_MAXIMUM(1, 48),
-    HID_LOGICAL_MINIMUM(1, 0),
-    HID_LOGICAL_MAXIMUM(1, 1),
-    HID_PHYSICAL_MAXIMUM(1, 1),
-    HID_REPORT_SIZE(1),
-    HID_REPORT_COUNT(48),
-    HID_INPUT(DATA, VARIABLE, ABSOLUTE, NO_WRAP, LINEAR, PREFERRED_STATE, NO_NULL_POSITION),
+    __ HID_USAGE_PAGE(SIMULATION),
+    __ HID_USAGE_PAGE(BUTTONS),
+    __ HID_USAGE_MINIMUM(1, 1),
+    __ HID_USAGE_MAXIMUM(1, 48),
+    __ HID_LOGICAL_MINIMUM(1, 0),
+    __ HID_LOGICAL_MAXIMUM(1, 1),
+    __ HID_PHYSICAL_MAXIMUM(1, 1),
+    __ HID_REPORT_SIZE(1),
+    __ HID_REPORT_COUNT(48),
+    __ HID_INPUT(DATA, VARIABLE, ABSOLUTE, NO_WRAP, LINEAR, PREFERRED_STATE, NO_NULL_POSITION),
 
     // Reserved for future use. Pad with null. (29 bytes)
-    HID_USAGE(UNDEFINED),
-    HID_REPORT_SIZE(8),
-    HID_REPORT_COUNT(29),
-    HID_INPUT(CONSTANT, ARRAY, ABSOLUTE, NO_WRAP, LINEAR, PREFERRED_STATE, NO_NULL_POSITION),
-    HID_USAGE_PAGE2(2, 0xFFA0),  // Vendor defined FF0A
-    HID_USAGE(UNDEFINED),
+    __ HID_USAGE(UNDEFINED),
+    __ HID_REPORT_SIZE(8),
+    __ HID_REPORT_COUNT(29),
+    __ HID_INPUT(CONSTANT, ARRAY, ABSOLUTE, NO_WRAP, LINEAR, PREFERRED_STATE, NO_NULL_POSITION),
+    __ HID_USAGE_PAGE2(2, 0xFFA0),  // Vendor defined FF0A
+    __ HID_USAGE(UNDEFINED),
 
     // General-purpose commands to the board. First byte is the command, then 62 data byte
-    HID_REPORT_ID(HID_REPORT_ID_IO4_CMD),
-    HID_COLLECTION(APPLICATION),
-    HID_USAGE(UNDEFINED),
-    HID_LOGICAL_MINIMUM(1, 0),
-    HID_LOGICAL_MAXIMUM(2, 255),
-    HID_REPORT_SIZE(8),
-    HID_REPORT_COUNT(63),
-    HID_OUTPUT(DATA, VARIABLE, ABSOLUTE, NO_WRAP, LINEAR, PREFERRED_STATE, NO_NULL_POSITION,
-               NON_VOLATILE),
-    HID_END_COLLECTION(APPLICATION),
+    __ HID_REPORT_ID(HID_REPORT_ID_IO4_CMD),
+    __ HID_COLLECTION(APPLICATION),
+    __ __ HID_USAGE(UNDEFINED),
+    __ __ HID_LOGICAL_MINIMUM(1, 0),
+    __ __ HID_LOGICAL_MAXIMUM(2, 255),
+    __ __ HID_REPORT_SIZE(8),
+    __ __ HID_REPORT_COUNT(63),
+    __ __ HID_OUTPUT(DATA, VARIABLE, ABSOLUTE, NO_WRAP, LINEAR, PREFERRED_STATE, NO_NULL_POSITION,
+                     NON_VOLATILE),
+    __ HID_END_COLLECTION(APPLICATION),
 
     HID_END_COLLECTION(APPLICATION),
 };
+
+#define _FINGER_DESCRIPTOR                         \
+    HID_USAGE(FINGER),                        /**/ \
+        HID_COLLECTION(LOGICAL),              /**/ \
+        HID_USAGE(TIP_SWITCH),                /**/ \
+        HID_LOGICAL_MINIMUM(1, 0),            /**/ \
+        HID_LOGICAL_MAXIMUM(1, 1),            /**/ \
+        HID_REPORT_SIZE(1),                   /**/ \
+        HID_REPORT_COUNT(1),                  /**/ \
+        HID_INPUT(DATA, VARIABLE, ABSOLUTE),  /**/ \
+        HID_REPORT_COUNT(7),                  /**/ \
+        HID_INPUT(CONSTANT, ARRAY, ABSOLUTE), /**/ \
+        HID_REPORT_SIZE(8),                   /**/ \
+        HID_USAGE(CONTACT_IDENTIFIER),        /**/ \
+        HID_REPORT_COUNT(1),                  /**/ \
+        HID_INPUT(DATA, VARIABLE, ABSOLUTE),  /**/ \
+        HID_USAGE_PAGE(GENERIC_DESKTOP),      /**/ \
+        HID_LOGICAL_MAXIMUM(2, 127),          /**/ \
+        HID_REPORT_SIZE(8),                   /**/ \
+        HID_REPORT_COUNT(2),                  /**/ \
+        HID_PHYSICAL_MINIMUM(1, 0),           /**/ \
+        HID_PHYSICAL_MAXIMUM(2, 127),         /**/ \
+        HID_USAGE(X),                         /**/ \
+        HID_USAGE(Y),                         /**/ \
+        HID_INPUT(DATA, VARIABLE, ABSOLUTE),  /**/ \
+        HID_USAGE_PAGE(DIGITIZER),            /**/ \
+        HID_USAGE(WIDTH),                     /**/ \
+        HID_USAGE(HEIGHT),                    /**/ \
+        HID_INPUT(DATA, VARIABLE, ABSOLUTE),  /**/ \
+        HID_END_COLLECTION(LOGICAL)
 
 static const uint8_t Keyboard_ReportDescriptor[] = {
     // Keyboard input report
     HID_USAGE_PAGE(GENERIC_DESKTOP),
     HID_USAGE(KEYBOARD),
     HID_COLLECTION(APPLICATION),
-    HID_REPORT_ID(HID_REPORT_ID_KEYBOARD),
-
-    HID_USAGE_PAGE(KEYBOARD),
-    HID_LOGICAL_MINIMUM(1, 0),
-    HID_LOGICAL_MAXIMUM(2, 231),
-    HID_USAGE_MINIMUM(1, 0),
-    HID_USAGE_MAXIMUM(1, 231),
-    HID_REPORT_SIZE(8),
-    HID_REPORT_COUNT(NUM_FN + NUM_AIR + NUM_GROUND),
-    HID_INPUT(DATA, ARRAY, ABSOLUTE),
-
+    __ HID_REPORT_ID(HID_REPORT_ID_KEYBOARD),
+    __ HID_USAGE_PAGE(KEYBOARD),
+    __ HID_LOGICAL_MINIMUM(1, 0),
+    __ HID_LOGICAL_MAXIMUM(2, 231),
+    __ HID_USAGE_MINIMUM(1, 0),
+    __ HID_USAGE_MAXIMUM(1, 231),
+    __ HID_REPORT_SIZE(8),
+    __ HID_REPORT_COUNT(NUM_FN + NUM_AIR + NUM_GROUND),
+    __ HID_INPUT(DATA, ARRAY, ABSOLUTE),
     HID_END_COLLECTION(APPLICATION),
 
     // Consumer control report
     HID_USAGE_PAGE(CONSUMER),
     HID_USAGE(CONSUMER_CONTROL),
     HID_COLLECTION(APPLICATION),
-    HID_REPORT_ID(HID_REPORT_ID_CONSUMER_CONTROL),
-
-    HID_USAGE_PAGE(CONSUMER),
-    HID_USAGE_MINIMUM(1, 0),
-    HID_USAGE_MAXIMUM(2, 0x0FFF),
-    HID_LOGICAL_MINIMUM(1, 0),
-    HID_LOGICAL_MAXIMUM(2, 0x0FFF),
-    HID_REPORT_SIZE(16),
-    HID_REPORT_COUNT(2),
-    HID_INPUT(DATA, ARRAY, ABSOLUTE, NO_WRAP, LINEAR, PREFERRED_STATE, NO_NULL_POSITION),
-
+    __ HID_REPORT_ID(HID_REPORT_ID_CONSUMER_CONTROL),
+    __ HID_USAGE_PAGE(CONSUMER),
+    __ HID_USAGE_MINIMUM(1, 0),
+    __ HID_USAGE_MAXIMUM(2, 0x0FFF),
+    __ HID_LOGICAL_MINIMUM(1, 0),
+    __ HID_LOGICAL_MAXIMUM(2, 0x0FFF),
+    __ HID_REPORT_SIZE(16),
+    __ HID_REPORT_COUNT(2),
+    __ HID_INPUT(DATA, ARRAY, ABSOLUTE, NO_WRAP, LINEAR, PREFERRED_STATE, NO_NULL_POSITION),
     HID_END_COLLECTION(APPLICATION),
 
     // Report for sending the enter key
     HID_USAGE_PAGE(GENERIC_DESKTOP),
     HID_USAGE(KEYBOARD),
     HID_COLLECTION(APPLICATION),
-    HID_REPORT_ID(HID_REPORT_ID_ENTER),
+    __ HID_REPORT_ID(HID_REPORT_ID_ENTER),
+    __ HID_USAGE_PAGE(KEYBOARD),
+    __ HID_LOGICAL_MINIMUM(1, 0),
+    __ HID_LOGICAL_MAXIMUM(2, 231),
+    __ HID_USAGE_MINIMUM(1, 0),
+    __ HID_USAGE_MAXIMUM(1, 231),
+    __ HID_REPORT_SIZE(8),
+    __ HID_REPORT_COUNT(1),
+    __ HID_INPUT(DATA, ARRAY, ABSOLUTE),
+    HID_END_COLLECTION(APPLICATION),
 
-    HID_USAGE_PAGE(KEYBOARD),
-    HID_LOGICAL_MINIMUM(1, 0),
-    HID_LOGICAL_MAXIMUM(2, 231),
-    HID_USAGE_MINIMUM(1, 0),
-    HID_USAGE_MAXIMUM(1, 231),
-    HID_REPORT_SIZE(8),
+#ifdef ENABLE_TOUCH_INPUT
+    // Touch input report
+    HID_USAGE_PAGE(DIGITIZER),
+    HID_USAGE(TOUCH_SCREEN),
+    HID_COLLECTION(APPLICATION),
+    HID_REPORT_ID(HID_REPORT_ID_TOUCH),
+
+    _FINGER_DESCRIPTOR,
+    _FINGER_DESCRIPTOR,
+    _FINGER_DESCRIPTOR,
+    _FINGER_DESCRIPTOR,
+    _FINGER_DESCRIPTOR,
+    _FINGER_DESCRIPTOR,
+    _FINGER_DESCRIPTOR,
+    _FINGER_DESCRIPTOR,
+
+    HID_USAGE_PAGE(DIGITIZER),
+    HID_USAGE(CONTACT_COUNT),
+    HID_LOGICAL_MAXIMUM(1, 127),
     HID_REPORT_COUNT(1),
-    HID_INPUT(DATA, ARRAY, ABSOLUTE),
+    HID_REPORT_SIZE(8),
+    HID_INPUT(DATA, VARIABLE, ABSOLUTE),
+    // Aren't we meant to have contact count maximum? (id 55h)
 
     HID_END_COLLECTION(APPLICATION),
+#endif
 };
 
 usb_device_descr_t gIO4DeviceDescriptor = {
@@ -179,8 +231,8 @@ typedef struct __packed {
      * We're meant to have an OUT endpoint for IO4, but IO4 uses the Win32 WriteFile API, which will
      * happily fall back to SET_REPORT calls on the control endpoints if there's no OUT endpoint.
      *
-     * Chunithm never uses the output capability of IO4, so we have no high-frequency data that
-     * might choke our control endpoints--we just need to support the initial configuration packets.
+     * IO4 receives OUT packets at a 47ms interval on average, 25%=46.8ms, 75%=61.3ms
+     * As such, we're not going to saturate our control endpoint by bootlegging off it for HID!
      */
     // const usb_desc_endpoint_t HID_EndpointOut;
 
@@ -316,7 +368,7 @@ static const config_desc_t gConfigDescriptor = {
         DESC_ENDPOINT,
         USBD_HID_IO4_EP_IN,
         EP_INT,
-        USBD_HID_BUF_LEN,
+        USBD_HID_BUF_LEN_IO4,
         HID_IO4_INT_IN_INTERVAL,
     },
 
@@ -346,7 +398,7 @@ static const config_desc_t gConfigDescriptor = {
         DESC_ENDPOINT,
         USBD_HID_MISC_EP_IN,
         EP_INT,
-        USBD_HID_BUF_LEN,
+        USBD_HID_BUF_LEN_IN,
         HID_DEFAULT_INT_IN_INTERVAL,
     },
     {
@@ -354,7 +406,7 @@ static const config_desc_t gConfigDescriptor = {
         DESC_ENDPOINT,
         USBD_HID_MISC_EP_OUT,
         EP_INT,
-        USBD_HID_BUF_LEN,
+        USBD_HID_BUF_LEN_OUT,
         HID_DEFAULT_INT_IN_INTERVAL,
     },
 };

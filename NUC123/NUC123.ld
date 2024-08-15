@@ -27,7 +27,9 @@ ENTRY(Reset_Handler)
 SECTIONS {
 	.text : {
 		KEEP(*(.vectors))
-		. = . + 16;
+		KEEP(*(.compile_timestamp))
+		. = ALIGN(16);
+
 		/* KEEP(*(.init)) */
 		/* KEEP(*(.text._entry)) */
 		*(.text*)

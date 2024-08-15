@@ -70,14 +70,16 @@ void Digital_TickInputs() {
 
 int _entry(void) {
     SYS_UnlockReg();
+
+    // Load our configuration, so we know if the LED processor should be rebooted
+    FMC_EEPROM_Load();
+
     SYS_Init();
 #ifdef ENABLE_BOOTLOADER_CHECK
     SYS_Bootloader_Check();
 #endif
     SYS_ModuleInit();
     // TODO: Re-lock registers, ideally. Need to check which registers we use where
-
-    FMC_EEPROM_Load();
 
     gu8VComReady = 1;
     gu8HIDIO4Ready = 1;
@@ -108,11 +110,10 @@ int _entry(void) {
         if (bPSoCDirtyVolatile) {
             bPSoCDirtyVolatile = 0;
             PSoC_PostProcessing();
-
-            if (!bPSoCHasTalked) {
-                PSoC_SetFingerCapacitanceFromConfig(1);
-                bPSoCHasTalked = 1;
-            }
+        }
+        if (bPSoCAliveVolatile && !bPSoCHasTalked) {
+            PSoC_SetFingerCapacitanceFromConfig(1);
+            bPSoCHasTalked = 1;
         }
 
         Slider_TickSerial();

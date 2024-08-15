@@ -11,6 +11,9 @@
 
 #include "_compiler.h"
 
+// Are we going to be doing global colour correction on the LED MCU (yes!)
+#define LED_CORRECTION_ON_LED_MCU
+
 // === LED Firmware Type Configuration ===
 // (Only applicable on the host)
 #define LED_FW_STOCK 0
@@ -32,9 +35,9 @@
 #define LED_NUM_GROUND_LOGICAL 31
 // Ground: [0] = Obscured, [1] = Right, [47] = Left
 #define LED_NUM_GROUND_PHYSICAL 48
-// Right wing: [0] = Bottom, [23] = Top
-// Left wing: [23] = Bottom, [0] = Top
-#define LED_NUM_WING 24
+// Right tower: [0] = Bottom, [23] = Top
+// Left tower: [23] = Bottom, [0] = Top
+#define LED_NUM_TOWER 24
 
 // === Colour Byte Order Definitions ===
 // What we know and love
@@ -103,19 +106,19 @@ typedef struct __packed {
 
 // === HOST->LED MCU Packets ===
 typedef struct __packed {
-    rgb_t aWingL[LED_NUM_WING];
-    rgb_t aWingR[LED_NUM_WING];
-} _led_wings_rgb;
+    rgb_t aTowerL[LED_NUM_TOWER];
+    rgb_t aTowerR[LED_NUM_TOWER];
+} _led_towers_rgb;
 typedef struct __packed {
-    hsv_t aWingL[LED_NUM_WING];
-    hsv_t aWingR[LED_NUM_WING];
-} _led_wings_hsv;
+    hsv_t aTowerL[LED_NUM_TOWER];
+    hsv_t aTowerR[LED_NUM_TOWER];
+} _led_towers_hsv;
 
 typedef struct __packed {
     uint8_t u8Cmd;
     uint32_t u32Ground;
 
-    uint8_t u8WingFill;
+    uint8_t u8TowerFill;
 #if LED_FIRMWARE_TYPE == LED_FW_MAINLAND
     uint8_t u8Rainbow;
     uint8_t u8Rsv07;
@@ -137,31 +140,31 @@ typedef struct __packed {
     uint8_t u8Config;
 #endif
     rgb_t aGround[LED_NUM_GROUND_LOGICAL];
-    _led_wings_rgb Wings;
+    _led_towers_rgb Towers;
 } led_rx_full, *Pled_rx_full;
 
 typedef struct __packed {
     uint8_t u8Cmd;
     uint8_t u8GroundBrightness;
-    uint8_t u8WingBrightness;
+    uint8_t u8TowerBrightness;
     rgb_t aGround[LED_NUM_GROUND_LOGICAL];
-    _led_wings_rgb Wings;
+    _led_towers_rgb Towers;
 } led_rx_custom_rgb, *Pled_rx_custom_rgb;
 
 typedef struct __packed {
     uint8_t u8Cmd;
     uint8_t u8GroundBrightness;
-    uint8_t u8WingBrightness;
+    uint8_t u8TowerBrightness;
     rgb_t aGround[LED_NUM_GROUND_LOGICAL];
-    _led_wings_hsv Wings;
+    _led_towers_hsv Towers;
 } led_rx_custom_mixed, *Pled_rx_custom_mixed;
 
 typedef struct __packed {
     uint8_t u8Cmd;
     uint8_t u8GroundBrightness;
-    uint8_t u8WingBrightness;
+    uint8_t u8TowerBrightness;
     hsv_t aGround[LED_NUM_GROUND_LOGICAL];
-    _led_wings_hsv Wings;
+    _led_towers_hsv Towers;
 } led_rx_custom_hsv, *Pled_rx_custom_hsv;
 
 typedef struct __packed {
@@ -209,5 +212,4 @@ typedef struct __packed {
 #define LED_DIVIDER_14_15 29
 
 // === HSV Definitions ===
-#define LED_HUE_SCALE 5  // For transmission to LED board in basic mode
 #define LED_HUE_MAX 360

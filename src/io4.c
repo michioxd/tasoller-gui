@@ -58,16 +58,6 @@ void IO4_HID_Tick(void) {
 }
 
 void IO4_Control(uint8_t u8Cmd, uint32_t u32Size, volatile uint8_t *pu8Buffer) {
-    /**
-     * Setup sequence:
-     *
-     * - IO4_CMD_CLEAR_BOARD_STATUS
-     * - IO4_CMD_SET_COMM_TIMEOUT (00)
-     * - IO4_CMD_SET_SAMPLING_COUNT (06)
-     * - IO4_CMD_SET_GENERAL_OUTPUT (00 00 00)
-     * - IO4_CMD_SET_UNIQUE_OUTPUT (38 00 00 00 ..)
-     */
-
     switch (u8Cmd) {
         case IO4_CMD_SET_COMM_TIMEOUT:
             if (u32Size >= 1) {

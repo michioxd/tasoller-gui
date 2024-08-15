@@ -75,11 +75,27 @@ void SYS_Init(void) {
     GPIO_SetMode(_PIN_EC3, GPIO_PMD_INPUT);
     GPIO_SetMode(_PIN_USB_MUX_SEL, GPIO_PMD_OUTPUT);
     GPIO_SetMode(_PIN_USB_MUX_EN, GPIO_PMD_OUTPUT);
-    GPIO_SetMode(_PIN_LED_WING_PWR, GPIO_PMD_OUTPUT);
+    GPIO_SetMode(_PIN_LED_TOWER_PWR, GPIO_PMD_OUTPUT);
     GPIO_SetMode(_PIN_LED_GROUND_PWR, GPIO_PMD_OUTPUT);
 
-    PIN_LED_WING_PWR = 1;
+    PIN_LED_TOWER_PWR = 1;
     PIN_LED_GROUND_PWR = 1;
+
+    if (gConfig.u8NextBootLEDBootloader) {
+        // If we've been instructed to, immediately reboot the LED module into LDROM
+
+        gConfig.u8NextBootLEDBootloader = 0;
+        bConfigDirty = 1;
+        FMC_EEPROM_Store();
+
+        // Switch PA10 and PA11 to GPIO so we can pull them low
+        SYS->GPA_MFP &= ~(SYS_GPA_MFP_PA10_Msk | SYS_GPA_MFP_PA11_Msk);
+        SYS->GPA_MFP |= (SYS_GPA_MFP_PA10_GPIO | SYS_GPA_MFP_PA11_GPIO);
+        SYS->ALT_MFP &= ~(SYS_ALT_MFP_PA10_Msk | SYS_ALT_MFP_PA11_Msk);
+        SYS->ALT_MFP |= (SYS_ALT_MFP_PA10_GPIO | SYS_ALT_MFP_PA11_GPIO);
+
+        SYS_WaitBootloaderLED();
+    }
 
     // If FN2 is depressed, trigger the LED bootloader to enter bootloading mode by pulling both
     // PA10 and PA11 low rather than configuring them for I2C (pulling high).
@@ -95,6 +111,10 @@ void SYS_Init(void) {
         GPIO_SetMode(_PIN_SCL, GPIO_PMD_OUTPUT);
         PIN_SDA = 0;
         PIN_SCL = 0;
+
+        // TODO: Nicer way of doing this for the automated firmware process?
+        // while (1)
+        //     ;
     } else {
         // Set GPA multi-function pins for I2C1 SDA and SCL
         SYS->GPA_MFP &= ~(SYS_GPA_MFP_PA10_Msk | SYS_GPA_MFP_PA11_Msk);
@@ -208,6 +228,13 @@ void TMR0_IRQHandler(void) {
 void __attribute__((noreturn)) SYS_EnterLDROM(void) {
     SYS_UnlockReg();
 
+    // Turn off our USB PHY
+    USBD->ATTR = 0x650;
+    NVIC_DisableIRQ(USBD_IRQn);
+    SYS_ResetModule(USBD_RST);
+    // Give Windows a moment to notice the disconnection
+    CLK_SysTickLongDelay(1000 ms);
+
     // If we use a CPU reset, I2C is left setup and so the LED board will be timing out rather than
     // early-NACKS.
     // If we use a CHIP reset we aren't guaranteed to land in LDROM because it's based on the CONFIG
@@ -255,7 +282,7 @@ void SYS_WaitBootloaderLED(void) {
     NVIC_DisableIRQ(USBD_IRQn);
     SYS_ResetModule(USBD_RST);
     // Give Windows a moment to notice the disconnection
-    CLK_SysTickLongDelay(1000 ms);
+    CLK_SysTickLongDelay(500 ms);
     // Switch the USB connection over the LED microcontroller
     PIN_USB_MUX_SEL = USB_MUX_LEDS;
     PIN_USB_MUX_EN = USB_MUX_ENABLE;

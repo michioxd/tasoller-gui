@@ -168,17 +168,17 @@ static const uint8_t _LED_GroundBrightness(void) {
     }
     return gConfig.u8LedGroundBrightness;
 }
-static const uint8_t _LED_WingBrightness(void) {
-    if (gbLedDataIsControlledInt) return gConfig.u8LedWingBrightness;
+static const uint8_t _LED_TowerBrightness(void) {
+    if (gbLedDataIsControlledInt) return gConfig.u8LedTowerBrightness;
     if (g_u8UsbState == USB_STATE_SUSPEND && gu32NowMs > 5000) return 0;
     if (gbLedDataIsControlledExt)
-        return ((uint16_t)gConfig.u8LedGroundBrightness * (uint16_t)gu8IO4PWMScale) / 255;
-    return gConfig.u8LedWingBrightness;
+        return ((uint16_t)gConfig.u8LedTowerBrightness * (uint16_t)gu8IO4PWMScale) / 255;
+    return gConfig.u8LedTowerBrightness;
 }
 
 static inline void _LED_SetPower(void) {
     PIN_LED_GROUND_PWR = _LED_GroundBrightness() ? 1 : 0;
-    PIN_LED_WING_PWR = _LED_WingBrightness() ? 1 : 0;
+    PIN_LED_TOWER_PWR = _LED_TowerBrightness() ? 1 : 0;
 }
 
 void LED_Write(void) {
@@ -195,25 +195,25 @@ void LED_Write(void) {
     if (gbLedDataIsControlledInt) {
         pTxHSV->u8Cmd = LED_CMD_CUSTOM_HSV;
         pTxHSV->u8GroundBrightness = _LED_GroundBrightness();
-        pTxHSV->u8WingBrightness = _LED_WingBrightness();
+        pTxHSV->u8TowerBrightness = _LED_TowerBrightness();
         _LED_SetPower();
 
         LED_Ground_Internal_HSV(pTxHSV->aGround);
-        LED_Wings_Reactive_HSV(&pTxHSV->Wings);
+        LED_Towers_Reactive_HSV(&pTxHSV->Towers);
     } else if (gbLedDataIsControlledExt) {
         // RGB control from the game
         pTxRGB->u8Cmd = LED_CMD_CUSTOM_RGB;
         pTxRGB->u8GroundBrightness = _LED_GroundBrightness();
-        pTxRGB->u8WingBrightness = _LED_WingBrightness();
+        pTxRGB->u8TowerBrightness = _LED_TowerBrightness();
         _LED_SetPower();
 
         LED_Ground_Controlled_RGB(pTxRGB->aGround);
-        LED_Wings_Controlled_RGB(&pTxRGB->Wings);
+        LED_Towers_Controlled_RGB(&pTxRGB->Towers);
     } else {
         // User-set coloring scheme
         pTxHSV->u8Cmd = LED_CMD_CUSTOM_HSV;
         pTxHSV->u8GroundBrightness = _LED_GroundBrightness();
-        pTxHSV->u8WingBrightness = _LED_WingBrightness();
+        pTxHSV->u8TowerBrightness = _LED_TowerBrightness();
         _LED_SetPower();
 
         if (gConfig.bEnableRainbow) {
@@ -221,7 +221,7 @@ void LED_Write(void) {
         } else {
             LED_Ground_Static_HSV(pTxHSV->aGround);
         }
-        LED_Wings_Reactive_HSV(&pTxHSV->Wings);
+        LED_Towers_Reactive_HSV(&pTxHSV->Towers);
     }
 }
 

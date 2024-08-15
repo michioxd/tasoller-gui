@@ -37,4 +37,4 @@ clean:
 
 $(shell mkdir $(OBJ_DIR))
 
-.PHONY: all clean
+.PHONY: all clean $(SRC_DIR)/timestamp.c

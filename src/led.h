@@ -19,22 +19,22 @@ extern volatile uint16_t u16I2CRxIndex;
 extern uint8_t gbLedIsCustom;
 
 // === Assigners (led_impl.c) ===
-void LED_Wings_Reactive_HSV(_led_wings_hsv* pWings);
+void LED_Towers_Reactive_HSV(_led_towers_hsv* pTowers);
 void LED_Ground_Rainbow_HSV(hsv_t* aGround);
 void LED_Ground_Static_HSV(hsv_t* aGround);
 void LED_Ground_Internal_HSV(hsv_t* aGround);
 /** All "controlled" data is in RGB format, so these aren't a thing
- * void LED_Wings_Controlled_HSV(_led_wings_hsv* pWings);
+ * void LED_Towers_Controlled_HSV(_led_towers_hsv* pTowers);
  * void LED_Ground_Controlled_HSV(hsv_t* aGround);
  */
 
 // Unimplemented nonsense stuff
-void LED_Wings_Reactive_RGB(_led_wings_rgb* pWings);
-void LED_Ground_Rainbow_RGB(rgb_t* pWings);
+void LED_Towers_Reactive_RGB(_led_towers_rgb* pTowers);
+void LED_Ground_Rainbow_RGB(rgb_t* pTowers);
 void LED_Ground_Internal_RGB(rgb_t* aGround);
 void LED_Ground_Static_RGB(rgb_t* aGround);
 // Actual RGBs that're used
-void LED_Wings_Controlled_RGB(_led_wings_rgb* pWings);
+void LED_Towers_Controlled_RGB(_led_towers_rgb* pTowers);
 void LED_Ground_Controlled_RGB(rgb_t* aGround);
 
 // === Exported functions ===

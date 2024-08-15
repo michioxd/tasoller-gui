@@ -10,7 +10,7 @@
 #define PIN_RX2 PD9
 #define PIN_RX3 PD10
 #define PIN_RX4 PD11
-#define PIN_LED_WING_PWR PB13
+#define PIN_LED_TOWER_PWR PB13
 #define PIN_LED_GROUND_PWR PC3
 
 #define _PIN_SDA PA, BIT10
@@ -25,7 +25,7 @@
 #define _PIN_RX2 PD, BIT9
 #define _PIN_RX3 PD, BIT10
 #define _PIN_RX4 PD, BIT11
-#define _PIN_LED_WING_PWR PB, BIT13
+#define _PIN_LED_TOWER_PWR PB, BIT13
 #define _PIN_LED_GROUND_PWR PC, BIT3
 
 #define PIN_AIR1 PIN_RX2

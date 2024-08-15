@@ -71,6 +71,30 @@ Additionally, the following tests may be run for diagnostics:
 
 xHSETT can be used to directly control the USB device, such as sending SUSPEND signals.
 
+### Endpoint mapping
+The NUC123 has 8 endpoints available. They are currently allocated as:
+
+| Endpoint | Use             | Direction | Buffer size |
+| -------- | --------------- | --------- | ----------- |
+| 0        | Control         | IN        | 64          |
+| 1        | Control         | OUT       | 64          |
+| 2        | Slider CDC Data | IN        | 64          |
+| 3        | Slider CDC Data | OUT       | 64          |
+| 4        | CDC Command     | IN        | 16          |
+| 5        | IO4 HID         | IN        | 64          |
+| 6        | Misc HID        | IN        | 64          |
+| 7        | Misc HID        | OUT       | 64          |
+
+The USB PHY has a 512 byte memory buffer. 16 bytes of this are reserved for setup packets. We currently use 464 bytes for endpoints, leaving 32 bytes unassigned.
+
+amdaemon rejects HID packets with unknown report IDs, so endpoint 5 and 6 cannot be merged.
+
+Endpoint 7 is currently unused, and could be bundled into endpoint 1 (as IO4 is currently doing).
+
+To add CDC serial for the air towers for we would need 4 additional endpoints, which we don't have.
+
+We can't use the NUC121 because it's muxed with the 123 :).
+
 ## Airs
 See https://www.shinkoh-elecs.jp/wp-content/uploads/2024/05/C_KB1281_1581_24A.pdf
 

@@ -44,17 +44,20 @@ typedef struct __attribute__((aligned(4), packed)) {
     // Only needs 4 bits but we aren't short atm
     uint8_t u8Sens;  // [1~16], Higher = more sensitive
 
-    uint16_t u16HueWingLeft;
-    uint16_t u16HueWingRight;
+    uint16_t u16HueTowerLeft;
+    uint16_t u16HueTowerRight;
     uint16_t u16HueGround;
     uint16_t u16HueGroundActive;
 
     uint8_t u8LedGroundBrightness;
-    uint8_t u8LedWingBrightness;
+    uint8_t u8LedTowerBrightness;
 
     // Calibration data
     uint16_t u16PSoCScaleMin[32];
     uint16_t u16PSoCScaleMax[32];
+
+    // State data
+    uint8_t u8NextBootLEDBootloader;
 } flash_t;
 extern flash_t gConfig;
 extern uint8_t bConfigDirty;

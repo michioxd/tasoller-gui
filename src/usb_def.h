@@ -55,23 +55,28 @@ enum : uint8_t {
 #define USBD_CDC_CMD_MAX_SIZE (16)
 #define USBD_CDC_IN_MAX_SIZE (64)   // Device -> Host
 #define USBD_CDC_OUT_MAX_SIZE (64)  // Host -> Device
-#define USBD_HID_BUF_LEN (64)
+#define USBD_HID_BUF_LEN_IO4 (64)
+#define USBD_HID_BUF_LEN_IN (64) // 104
+#define USBD_HID_BUF_LEN_OUT (64)
 
-_Static_assert(USBD_HID_BUF_LEN >= sizeof(hid_kbd_report_t) &&
-                   USBD_HID_BUF_LEN >= sizeof(hid_consumer_report_t) &&
-                   USBD_HID_BUF_LEN >= sizeof(io4_hid_in_t) &&
-                   USBD_HID_BUF_LEN >= sizeof(io4_hid_out_t),
+_Static_assert(USBD_HID_BUF_LEN_IN >= sizeof(hid_kbd_report_t) &&
+                   USBD_HID_BUF_LEN_IN >= sizeof(hid_consumer_report_t) &&
+                   USBD_HID_BUF_LEN_IN >= sizeof(hid_enter_report_t) &&
+                   USBD_HID_BUF_LEN_IO4 >= sizeof(io4_hid_in_t) &&
+                   USBD_HID_BUF_LEN_IO4 >= sizeof(io4_hid_out_t),
                "HID USB buffer insufficient size for possible reports");
 
-// Endpoint packet max size (cannot total more than 512!)
-#define EP0_MAX_PKT_SIZE 64
-#define EP1_MAX_PKT_SIZE 64
-#define EP2_MAX_PKT_SIZE USBD_CDC_IN_MAX_SIZE
-#define EP3_MAX_PKT_SIZE USBD_CDC_OUT_MAX_SIZE
-#define EP4_MAX_PKT_SIZE USBD_CDC_CMD_MAX_SIZE
-#define EP5_MAX_PKT_SIZE USBD_HID_BUF_LEN
-#define EP6_MAX_PKT_SIZE USBD_HID_BUF_LEN
-#define EP7_MAX_PKT_SIZE USBD_HID_BUF_LEN
+// Endpoint packet max size (cannot total more than 504!)
+// Control must be 64 bytes because we're receiving IO4 OUT over EP1
+#define EP0_MAX_PKT_SIZE 64                     // Control     | device->host
+#define EP1_MAX_PKT_SIZE 64                     // Control     | host  ->device
+#define EP2_MAX_PKT_SIZE USBD_CDC_IN_MAX_SIZE   // CDC         | device->host
+#define EP3_MAX_PKT_SIZE USBD_CDC_OUT_MAX_SIZE  // CDC         | host  ->device
+#define EP4_MAX_PKT_SIZE USBD_CDC_CMD_MAX_SIZE  // CDC command | device->host   (hmm?)
+#define EP5_MAX_PKT_SIZE USBD_HID_BUF_LEN_IO4   // IO4 HID     | device->host
+#define EP6_MAX_PKT_SIZE USBD_HID_BUF_LEN_IN    // Misc HID    | device->host
+#define EP7_MAX_PKT_SIZE USBD_HID_BUF_LEN_OUT   // Misc HID    | host  ->device
+// TODO: Do we need host->device HID? We could save quite a few bytes and an endpoint!
 
 #define SETUP_BUF_BASE 0
 #define SETUP_BUF_LEN 8
