@@ -44,11 +44,11 @@ Stock firmware implements two commands. `A5` is a basic LED write based on a num
     uint8_t u8HueGroundActive;
 
     struct {
-        uint8_t bTowersOff: 1;
-        uint8_t bGroundOff: 1;
-        uint8_t bSeparators: 2;
-        uint8_t Rsv: 1;
-        uint8_t bKeyMode: 3;
+        uint8_t bKeyMode : 3;
+        uint8_t Rsv : 1;
+        uint8_t bSeparators : 2;
+        uint8_t bGroundOff : 1;
+        uint8_t bTowersOff : 1;
     };
     uint8_t u8LedSpecial;
 }
@@ -93,16 +93,16 @@ All hues are divided by 5, such that 360° = `72`
     uint8_t u8TowerFill;
 
     struct {
-        uint8_t bInvertRainbow: 1;
-        uint8_t bRainbowSeparator: 7;
+        uint8_t bRainbowSeparator : 7;
+        uint8_t bInvertRainbow : 1;
     };
 
     uint8_t Rsv07[3];
 
     struct {
-        bTowersOff: 1;
-        bGroundOff: 1;
-        Rsv: 6;
+        Rsv : 6;
+        bGroundOff : 1;
+        bTowersOff : 1;
     };
     uint8_t u8LedSpecial;
 }
@@ -141,9 +141,9 @@ Writes raw RGB data to all LEDs. Colours are transmitted in GRB format.
 struct {
     uint8_t u8Cmd = 0x5A;
     struct {
-        bTowersOff: 1;
-        bGroundOff: 1;
-        u8LedSpecial: 6;
+        u8LedSpecial : 6;
+        bGroundOff : 1;
+        bTowersOff : 1;
     } u8Config;
 
     grb_t aGround[31];

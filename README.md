@@ -52,7 +52,7 @@ Tap FN1 to insert a coin. FN2 is currently unbound.
 ### Configuration
 While holding FN1, the following configuration options are available:
 
-![](./docs/Graphic_Slider_Settings.png)
+![](./docs/img/Graphic_Slider_Settings.png)
 
 ※ "Insert card" will hold the Enter key for 5 seconds
 
@@ -60,16 +60,16 @@ While holding FN1, the following configuration options are available:
 
 To enter the system test menu, double-tap FN2. This will mirror the on-screen controls, and additionally adds controls for the TEST and SERVICE buttons on a real cabinet. Double-tap FN2 again to leave this mode on the controller (note that this is not synced with the game exiting the menu!).
 
-![](./docs/Graphic_Slider_Test.png)
+![](./docs/img/Graphic_Slider_Test.png)
 
 To access the TEST and SERVICE buttons without entering the test menu, hold FN2 instead.
 
-![](./docs/Graphic_Slider_TestReduced.png)
+![](./docs/img/Graphic_Slider_TestReduced.png)
 
 ## Keyboard Mapping
 When the HID keyboard is enabled, the following mapping (UMIGURI defaults) is used:
 
-![](./docs/Graphic_Slider_Binds.png)
+![](./docs/img/Graphic_Slider_Binds.png)
 
 with the airs mapped as `0OLP,.`.
 
