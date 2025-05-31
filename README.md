@@ -56,6 +56,12 @@ While holding FN1, the following configuration options are available:
 
 ※ "Insert card" will hold the Enter key for 5 seconds
 
+### HID keyboard settings
+
+Double-tapping FN1 will bring you to the HID keyboard settings, where the following configuration options are available:
+
+![](./docs/img/Graphic_Slider_Keyboard.png)
+
 ### Test menu
 
 To enter the system test menu, double-tap FN2. This will mirror the on-screen controls, and additionally adds controls for the TEST and SERVICE buttons on a real cabinet. Double-tap FN2 again to leave this mode on the controller (note that this is not synced with the game exiting the menu!).
@@ -67,10 +73,54 @@ To access the TEST and SERVICE buttons without entering the test menu, hold FN2 
 ![](./docs/img/Graphic_Slider_TestReduced.png)
 
 ## Keyboard Mapping
-When the HID keyboard is enabled, the following mapping (UMIGURI defaults) is used:
 
-![](./docs/img/Graphic_Slider_Binds.png)
+When the HID keyboard mode is enabled, these mappings are used for the various configuration options, with the airs mapped as `0OLP,.`:
 
-with the airs mapped as `0OLP,.`.
+### 32k (UMIGURI default)
 
-Please note that this is slightly different to stock firmware!
+![](./docs/img/Graphic_Slider_Binds32k.png)
+
+### 16k
+
+![](./docs/img/Graphic_Slider_Binds16k.png)
+
+### 8k
+
+![](./docs/img/Graphic_Slider_Binds8k.png)
+
+### 4k
+
+![](./docs/img/Graphic_Slider_Binds4k.png)
+
+### 9k
+
+![](./docs/img/Graphic_Slider_Binds9k.png)
+
+
+## Divider Options
+
+When the HID keyboard mode is enabled, these are the options for the dividers:
+
+### No divider
+
+![](./docs/img/Graphic_Slider_DividerNone.png)
+
+### Single divider
+
+![](./docs/img/Graphic_Slider_DividerSingle.png)
+
+### 4k divider
+
+![](./docs/img/Graphic_Slider_Divider4k.png)
+
+### 8k divider
+
+![](./docs/img/Graphic_Slider_Divider8k.png)
+
+### All dividers
+
+![](./docs/img/Graphic_Slider_DividerAll.png)
+
+### 9k divider
+
+![](./docs/img/Graphic_Slider_Divider9k.png)
