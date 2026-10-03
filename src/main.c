@@ -112,7 +112,7 @@ int _entry(void) {
             PSoC_PostProcessing();
         }
         if (bPSoCAliveVolatile && !bPSoCHasTalked) {
-            PSoC_SetFingerCapacitanceFromConfig(1);
+            PSoC_SetFingerCapacitanceFromConfig(0);
             bPSoCHasTalked = 1;
         }
 

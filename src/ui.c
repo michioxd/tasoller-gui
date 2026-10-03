@@ -1,4 +1,5 @@
 #include "tasoller.h"
+#include "keymap.h"
 
 #define FN1_TAP_TIME 250   // ms of FN1 to enter config
 #define FN1_HOLD_TIME 250  // ms of FN1 to enter config
@@ -41,6 +42,32 @@ static void UI_TickSensitivity(void) {
 }
 
 static uint8_t su8SensTimeout = 0;
+static uint8_t su8KeyboardPage = 0;
+
+static void UI_TickKeyboard(void) {
+    UI_WriteRange(0, LED_NUM_GROUND_LOGICAL - 1, 0, 255, 0);
+    for (uint8_t cell = 0; cell < 6; cell++) {
+        gaControlledIntLedData[cell * 2].h = BLUE;
+        gaControlledIntLedData[cell * 2].v = cell == gConfig.u8KeyboardMode ? 255 : 60;
+        if (gu16PSoCDigitalPos & Keymap_VisualCellMask(cell)) {
+            Keymap_Switch(&gConfig, cell);
+        }
+    }
+    for (uint8_t divider = 0; divider < 7; divider++) {
+        uint8_t cell = divider + 7;
+        gaControlledIntLedData[cell * 2].h = GREEN;
+        gaControlledIntLedData[cell * 2].v = !gConfig.bEnableKeyboard ? 0 : divider == gConfig.u8DividerMode ? 255 : 60;
+        if (gConfig.bEnableKeyboard && (gu16PSoCDigitalPos & Keymap_VisualCellMask(cell)))
+            gConfig.u8DividerMode = divider;
+    }
+    gaControlledIntLedData[LED_CELL_14].s = 0;
+    gaControlledIntLedData[LED_CELL_14].v = 255;
+    if (gu16PSoCDigitalPos & CELL_14_Msk) su8KeyboardPage = 0;
+    gaControlledIntLedData[LED_CELL_15].h = gConfig.bEnableKeyboard ? GREEN : RED;
+    gaControlledIntLedData[LED_CELL_15].v = 255;
+    if (gu16PSoCDigitalPos & CELL_15_Msk) INV(gConfig.bEnableKeyboard);
+}
+
 static void UI_TickSettings(void) {
     // If either of the sensitivity settings are being changed, just render that
     if (gu16PSoCDigital & CELL_12_Msk) {
@@ -240,6 +267,7 @@ static void UI_TickServiceTest(void) {
 
 static uint8_t u8Fn1Held = 0;
 static inline void _UI_SettingsOnExit(void) {
+    su8KeyboardPage = 0;
     // If FN2 was released while still in sensitivity adjustment, make sure the changes save
     if (su8SensTimeout) {
         PSoC_SetFingerCapacitanceFromConfig(1);
@@ -263,6 +291,7 @@ void UI_Tick(void) {
     if (u8PosDb & DIGITAL_FN1_Msk) {
         if (u32LastFn1 && MS_SINCE(u32LastFn1) < FN1_TAP_TIME) {
             u8ConfigIsActive = !u8ConfigIsActive;
+            if (u8ConfigIsActive) su8KeyboardPage = 1;
 
             if (!u8ConfigIsActive) {
                 _UI_SettingsOnExit();
@@ -315,7 +344,16 @@ void UI_Tick(void) {
     if (u8Fn1Held >= FN1_HOLD_TIME || u8ConfigIsActive) {
         gbLedDataIsControlledInt = 1;
         gbUIOpen = 1;
-        UI_TickSettings();
+        // Hold FN1 always retains the original settings. Double-tap can open the extra page.
+        if (u8Fn1Held < FN1_HOLD_TIME && su8KeyboardPage) UI_TickKeyboard();
+        else {
+            UI_TickSettings();
+            if (u8ConfigIsActive && u8Fn1Held < FN1_HOLD_TIME && !su8SensTimeout) {
+                gaControlledIntLedData[LED_CELL_13].h = BLUE;
+                gaControlledIntLedData[LED_CELL_13].v = 255;
+                if (gu16PSoCDigitalPos & CELL_13_Msk) su8KeyboardPage = 1;
+            }
+        }
     } else if (u16Fn2Held >= FN2_HOLD_TIME || u8TestIsActive) {
         gbLedDataIsControlledInt = 1;
         gbUIOpen = 0;

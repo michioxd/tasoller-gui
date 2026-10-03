@@ -1,0 +1,683 @@
+import {
+    Button,
+    CheckBox,
+    ComboBox,
+    SpinBox,
+    Slider,
+    GroupBox,
+    Palette,
+    StyleMetrics,
+    VerticalBox,
+    HorizontalBox,
+} from "std-widgets.slint";
+
+export struct Settings {
+    keyboard: bool,
+    rainbow: bool,
+    sensitivity: int,
+    left: int,
+    right: int,
+    ground: int,
+    active: int,
+    ground-brightness: int,
+    tower-brightness: int,
+}
+
+component Label inherits Text {
+    vertical-alignment: center;
+    color: Palette.foreground;
+}
+
+component InputTile inherits Rectangle {
+    in property <string> label;
+    in property <string> key-label;
+    in property <int> level;
+    in property <bool> selected;
+    in property <bool> enabled;
+    in property <bool> horizontal: false;
+    in property <int> raw-start: -1;
+    in property <int> raw-width: 1;
+    in property <[int]> raw-levels;
+    callback chosen();
+    background: Palette.alternate-background.with-alpha(0.35);
+    border-color: focus.has-focus || root.selected ? Palette.accent-background : Palette.border;
+    border-width: focus.has-focus || root.selected ? 2px : 1px;
+    border-radius: 4px;
+    forward-focus: focus;
+    Rectangle {
+        background: Palette.accent-background;
+        opacity: root.level / 255 * 0.65;
+        border-radius: root.border-radius;
+    }
+
+    if root.raw-start >= 0: VerticalLayout {
+        padding: 3px;
+        spacing: 2px;
+        for row in 2: HorizontalLayout {
+            spacing: 2px;
+            for cell in root.raw-width: Rectangle {
+                background: Palette.accent-background;
+                opacity: root.raw-levels[root.raw-start - cell * 2 + row] / 255 * 0.65;
+                accessible-role: text;
+                accessible-label: "Pad \{root.raw-start - cell * 2 + row + 1}, intensity \{root.raw-levels[root.raw-start - cell * 2 + row]}";
+            }
+        }
+    }
+
+    if root.horizontal: HorizontalLayout {
+        padding: 4px;
+        alignment: center;
+        spacing: StyleMetrics.layout-spacing;
+
+        Text {
+            text: root.label;
+            color: Palette.foreground;
+            horizontal-alignment: center;
+            overflow: elide;
+            opacity: 0.7;
+        }
+
+        Text {
+            text: root.key-label;
+            color: Palette.foreground;
+            horizontal-alignment: center;
+            overflow: elide;
+            font-weight: 600;
+        }
+    }
+
+    if !root.horizontal: VerticalLayout {
+        padding: 4px;
+        alignment: center;
+        spacing: StyleMetrics.layout-spacing;
+
+        Text {
+            text: root.key-label;
+            color: Palette.foreground;
+            horizontal-alignment: center;
+            overflow: elide;
+            font-weight: 600;
+        }
+
+        Text {
+            text: root.label;
+            color: Palette.foreground;
+            horizontal-alignment: center;
+            overflow: elide;
+            opacity: 0.7;
+        }
+    }
+
+    focus := FocusScope {
+        enabled: root.enabled;
+        accessible-role: button;
+        accessible-label: "\{root.label}, \{root.key-label}, intensity \{root.level}";
+        key-pressed(event) => {
+            if event.text == "\n" || event.text == " " { root.chosen(); return accept; }
+            return reject;
+        }
+        TouchArea {
+            enabled: root.enabled;
+            clicked => { focus.focus(); root.chosen(); }
+        }
+    }
+}
+
+component NumberField inherits VerticalLayout {
+    in property <string> label;
+    in property <int> maximum: 359;
+    in property <int> minimum: 0;
+    in property <bool> enabled;
+    in-out property <int> value;
+    in property <bool> hue-preview: false;
+    callback released();
+    changed value => { slider.value = root.value; }
+    spacing: 2px;
+    HorizontalLayout {
+        spacing: StyleMetrics.layout-spacing;
+        Label {
+            text: root.label;
+            horizontal-stretch: 1;
+        }
+
+        if root.hue-preview: Rectangle {
+            width: 24px;
+            height: 16px;
+            background: hsv(root.value, 1, 1);
+            border-radius: 4px;
+            border-width: 1px;
+            border-color: Palette.border;
+            accessible-role: text;
+            accessible-label: "Hue preview: \{root.value} degrees";
+        }
+
+        Label {
+            text: "\{root.value}";
+            color: Palette.accent-background;
+        }
+    }
+
+    slider := Slider {
+        value: root.value;
+        minimum: root.minimum;
+        maximum: root.maximum;
+        enabled: root.enabled;
+        accessible-label: root.label;
+        min-height: 28px;
+        changed(v) => { root.value = Math.round(v); }
+        released => { root.released(); }
+    }
+}
+
+export component AppWindow inherits Window {
+    title: "TASOLLER configuration UI v\{root.app-version}";
+    preferred-width: 1280px;
+    preferred-height: 860px;
+    min-width: 1100px;
+    min-height: 900px;
+    in property <bool> backdrop-enabled: false;
+    background: root.backdrop-enabled ? transparent : Palette.background;
+    in property <brush> surface-background: root.backdrop-enabled
+        ? transparent
+        : Palette.background;
+    default-font-family: "Segoe UI";
+    in-out property <Settings> draft;
+    in property <Settings> applied;
+    in property <[string]> ports;
+    in-out property <string> port;
+    in property <bool> connected: false;
+    in property <bool> busy: false;
+    in property <bool> error: false;
+    in property <string> status: "Discovering compatible devices…";
+    in property <string> device-info;
+    in property <string> app-version: "?.?.?";
+    in property <[int]> draft-map;
+    in property <[int]> applied-map;
+    in property <[int]> draft-profiles;
+    in property <[int]> applied-profiles;
+    in property <[int]> input-levels;
+    in property <[string]> key-labels;
+    in property <[string]> usage-choices;
+    in property <int> selected-slot: 0;
+    in-out property <int> usage-index: 0;
+    in property <bool> map-dirty: false;
+    in property <int> keyboard-mode: 0;
+    in property <int> divider-mode: 4;
+    in property <int> applied-mode: 0;
+    in property <int> applied-divider: 4;
+    in property <[int]> group-starts;
+    in property <[int]> group-widths;
+    in-out property <bool> auto-lighting: false;
+    private property <bool> editable: root.connected && !root.busy;
+    private property <bool> dirty: root.draft != root.applied;
+    callback refresh();
+    callback connect();
+    callback disconnect();
+    callback read();
+    callback apply(Settings);
+    callback save(Settings);
+    callback reset();
+    callback select-input(int);
+    callback assign-usage(int);
+    callback select-mode(int);
+    callback select-divider(int);
+    callback apply-map();
+    callback export-map();
+    callback import-map();
+    callback apply-lighting(Settings);
+    callback auto-lighting-changed(bool);
+    callback github-clicked();
+
+    Rectangle {
+        background: root.surface-background;
+    }
+
+    VerticalBox {
+        padding: 2 * StyleMetrics.layout-padding;
+        spacing: 2 * StyleMetrics.layout-spacing;
+
+        HorizontalBox {
+            padding: 0px;
+
+            VerticalBox {
+                spacing: 0;
+                padding: 0;
+                Text {
+                    text: root.connected ? "Connected" : "Disconnected";
+                    font-weight: 600;
+                    font-size: 1.3rem;
+                    color: Palette.foreground;
+                }
+
+                Text {
+                    text: root.device-info != "" ? root.device-info : "No device connected!";
+                    font-weight: 400;
+                    font-size: 1rem;
+                    color: Palette.foreground;
+                    opacity: 0.7;
+                }
+            }
+
+            Rectangle {
+                horizontal-stretch: 1;
+            }
+
+            ComboBox {
+                model: root.ports;
+                current-value <=> root.port;
+                enabled: !root.busy && !root.connected;
+                accessible-label: "Compatible COM device";
+                max-width: 250px;
+                min-height: 0px;
+                horizontal-stretch: 1;
+            }
+
+            Button {
+                text: "Refresh";
+                enabled: !root.busy && !root.connected;
+                min-height: 0px;
+                clicked => { root.refresh(); }
+            }
+
+            Button {
+                text: root.connected ? "Disconnect" : "Connect";
+                enabled: !root.busy && (root.connected || root.port != "");
+                min-height: 0px;
+                primary: !root.connected;
+                clicked => { if root.connected { root.disconnect(); } else { root.connect(); } }
+            }
+        }
+
+        if !root.connected: VerticalLayout {
+            spacing: StyleMetrics.layout-spacing;
+            Rectangle {
+                vertical-stretch: 1;
+            }
+
+            Label {
+                text: "No TASOLLER device connected!";
+                color: Palette.foreground;
+                font-size: 1.6rem;
+                font-weight: 600;
+                horizontal-alignment: center;
+            }
+
+            Label {
+                text: "Please connect TASOLLER (ORIGIN) to a compatible COM port and click Connect.\nMake sure your device is running the firmware that released with this UI version. Otherwise, the UI may not work correctly or refuse to connect.";
+                color: Palette.foreground;
+                font-size: 1rem;
+                opacity: 0.7;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+            }
+
+            Rectangle {
+                vertical-stretch: 1;
+            }
+        }
+
+        if root.connected: VerticalLayout {
+            spacing: 2 * StyleMetrics.layout-spacing;
+
+            VerticalLayout {
+                Text {
+                    text: "AIR";
+                    font-weight: 600;
+                    height: 22px;
+                }
+
+                VerticalLayout {
+                    spacing: StyleMetrics.layout-spacing;
+                    for level in 6: HorizontalLayout {
+                        spacing: StyleMetrics.layout-spacing;
+
+                        InputTile {
+                            label: "\{6 - level}";
+                            key-label: !root.draft.keyboard ? "" : root.key-labels[39 - level] == "" ? "UN" : root.key-labels[39 - level];
+                            level: root.input-levels[39 - level];
+                            selected: root.selected-slot == 39 - level;
+                            enabled: root.editable;
+                            height: 25px;
+                            horizontal-stretch: 0;
+
+                            chosen => { root.select-input(39 - level); }
+                            horizontal: true;
+                        }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: StyleMetrics.layout-spacing;
+                if !root.draft.keyboard || root.keyboard-mode == 0: VerticalLayout {
+                    spacing: StyleMetrics.layout-spacing;
+                    for row in 2: HorizontalLayout {
+                        spacing: StyleMetrics.layout-spacing;
+                        for region in 16: InputTile {
+                            label: "\{(15 - region) * 2 + row + 1}";
+                            key-label: root.draft.keyboard ? root.key-labels[(15 - region) * 2 + row] : "";
+                            level: root.input-levels[(15 - region) * 2 + row];
+                            selected: root.selected-slot == (15 - region) * 2 + row;
+                            enabled: root.editable;
+                            min-height: 76px;
+                            chosen => { root.select-input((15 - region) * 2 + row); }
+                        }
+                    }
+                }
+                if root.draft.keyboard && root.keyboard-mode != 0: HorizontalLayout {
+                    spacing: StyleMetrics.layout-spacing;
+                    for start[group] in root.group-starts: InputTile {
+                        label: "Group \{group + 1}";
+                        key-label: root.key-labels[start];
+                        level: 0;
+                        raw-start: start;
+                        raw-width: root.group-widths[group];
+                        raw-levels: root.input-levels;
+                        horizontal-stretch: root.group-widths[group];
+                        selected: root.selected-slot == start;
+                        enabled: root.editable;
+                        min-height: 152px + StyleMetrics.layout-spacing;
+                        chosen => { root.select-input(start); }
+                    }
+                }
+
+                VerticalLayout {
+                    min-width: 60px;
+                    spacing: StyleMetrics.layout-spacing;
+                    alignment: center;
+
+                    for row in 2: InputTile {
+                        width: 60px;
+                        height: 50px;
+                        label: "FN\{row + 1}";
+                        key-label: !root.draft.keyboard ? "" : root.key-labels[33 - row] == "" ? "UN" : root.key-labels[33 - row];
+                        level: root.input-levels[33 - row];
+                        selected: root.selected-slot == 33 - row;
+                        enabled: root.editable;
+                        chosen => { root.select-input(33 - row); }
+                    }
+                }
+            }
+
+            HorizontalBox {
+                padding: 0px;
+                Label {
+                    text: root.selected-slot < 32 ? (root.keyboard-mode == 0 ? "Pad \{root.selected-slot + 1}" : "Group at pad \{root.selected-slot + 1}") : (root.selected-slot < 34 ? "FN\{34 - root.selected-slot}" : "AIR\{root.selected-slot - 33}");
+                }
+
+                ComboBox {
+                    model: root.usage-choices;
+                    current-index <=> root.usage-index;
+                    enabled: root.editable;
+                    accessible-label: "Assigned ordinary USB key for selected input";
+                    horizontal-stretch: 1;
+                    selected(value) => { root.assign-usage(self.current-index); }
+                }
+
+                Button {
+                    text: "Apply all profiles to RAM";
+                    enabled: root.editable && root.map-dirty;
+                    clicked => { root.apply-map(); }
+                }
+
+                Button {
+                    text: "Export";
+                    enabled: root.editable;
+                    clicked => { root.export-map(); }
+                }
+
+                Button {
+                    text: "Import";
+                    enabled: root.editable;
+                    clicked => { root.import-map(); }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 3 * StyleMetrics.layout-spacing;
+                GroupBox {
+                    title: "Input";
+                    min-width: 200px;
+                    VerticalBox {
+                        padding: 0px;
+                        NumberField {
+                            label: "Sensitivity (1-16)";
+                            minimum: 1;
+                            maximum: 16;
+                            value <=> root.draft.sensitivity;
+                            enabled: root.editable;
+                        }
+
+                        keyboard-toggle := CheckBox {
+                            private property <bool> device-keyboard: root.draft.keyboard;
+                            changed device-keyboard => { self.checked = self.device-keyboard; }
+                            text: "Enable keyboard output";
+                            checked <=> root.draft.keyboard;
+                            enabled: root.editable;
+                        }
+
+                        VerticalLayout {
+                            spacing: StyleMetrics.layout-spacing;
+                            Label {
+                                text: "Keyboard mode";
+                            }
+
+                            mode-selector := ComboBox {
+                                private property <int> device-mode: root.keyboard-mode;
+                                changed device-mode => { self.current-index = self.device-mode; }
+                                enabled: root.editable;
+                                horizontal-stretch: 1;
+                                model: ["32k", "16k", "9k", "8k", "4k", "2k"];
+                                current-index: root.keyboard-mode;
+                                accessible-label: "Keyboard mode";
+                                selected(value) => { root.select-mode(self.current-index); }
+                            }
+                        }
+
+                        VerticalLayout {
+                            spacing: StyleMetrics.layout-spacing;
+                            Label {
+                                text: "Divider options";
+                            }
+
+                            divider-selector := ComboBox {
+                                private property <int> device-divider: root.divider-mode == 3 ? 1 : root.divider-mode > 3 ? root.divider-mode - 1 : root.divider-mode;
+                                changed device-divider => { self.current-index = self.device-divider; }
+                                enabled: root.editable && root.draft.keyboard;
+                                horizontal-stretch: 1;
+                                model: ["No divider", "Single", "All", "4k", "8k", "9k"];
+                                current-index: self.device-divider;
+                                accessible-label: "Keyboard divider options";
+                                selected(value) => { root.select-divider(self.current-index >= 3 ? self.current-index + 1 : self.current-index); }
+                            }
+                        }
+
+                        Rectangle {
+                            vertical-stretch: 1;
+                        }
+                    }
+                }
+
+                GroupBox {
+                    title: "Ground Lighting";
+                    horizontal-stretch: 2;
+
+                    VerticalLayout {
+                        spacing: StyleMetrics.layout-spacing;
+
+                        CheckBox {
+                            text: "Rainbow";
+                            checked <=> root.draft.rainbow;
+                            enabled: root.editable;
+                            toggled => { if root.auto-lighting { root.apply-lighting(root.draft); } }
+                        }
+
+                        NumberField {
+                            label: "Ground hue (degress)";
+                            hue-preview: true;
+                            value <=> root.draft.ground;
+                            enabled: root.editable && !root.draft.rainbow;
+                            released => { if root.auto-lighting { root.apply-lighting(root.draft); } }
+                        }
+
+                        NumberField {
+                            label: "Active hue (degress)";
+                            hue-preview: true;
+                            value <=> root.draft.active;
+                            enabled: root.editable && !root.draft.rainbow;
+                            released => { if root.auto-lighting { root.apply-lighting(root.draft); } }
+                        }
+
+                        NumberField {
+                            label: "Brightness";
+                            maximum: 255;
+                            value <=> root.draft.ground-brightness;
+                            enabled: root.editable;
+                            released => { if root.auto-lighting { root.apply-lighting(root.draft); } }
+                        }
+
+                        Rectangle {
+                            vertical-stretch: 1;
+                        }
+                    }
+                }
+
+                GroupBox {
+                    title: "Tower Lighting";
+                    horizontal-stretch: 2;
+
+                    VerticalLayout {
+                        spacing: StyleMetrics.layout-spacing;
+                        NumberField {
+                            label: "Left hue (degress)";
+                            hue-preview: true;
+                            value <=> root.draft.left;
+                            enabled: root.editable;
+                            released => { if root.auto-lighting { root.apply-lighting(root.draft); } }
+                        }
+
+                        NumberField {
+                            label: "Right hue (degress)";
+                            hue-preview: true;
+                            value <=> root.draft.right;
+                            enabled: root.editable;
+                            released => { if root.auto-lighting { root.apply-lighting(root.draft); } }
+                        }
+
+                        NumberField {
+                            label: "Brightness";
+                            maximum: 255;
+                            value <=> root.draft.tower-brightness;
+                            enabled: root.editable;
+                            released => { if root.auto-lighting { root.apply-lighting(root.draft); } }
+                        }
+
+                        Rectangle {
+                            vertical-stretch: 1;
+                        }
+                    }
+                }
+
+                GroupBox {
+                    title: "Device settings";
+                    VerticalBox {
+                        padding: 0px;
+                        Button {
+                            text: "Read RAM";
+                            enabled: root.editable;
+                            clicked => { root.read(); }
+                        }
+
+                        Button {
+                            text: "Reset defaults";
+                            enabled: root.editable;
+                            clicked => { root.reset(); }
+                        }
+
+                        Button {
+                            text: "Apply settings to RAM";
+                            enabled: root.editable && (root.dirty || root.map-dirty);
+                            primary: true;
+                            clicked => { root.apply(root.draft); }
+                        }
+
+                        Button {
+                            text: "Write to flash";
+                            primary: true;
+                            enabled: root.editable && !root.dirty && !root.map-dirty;
+                            clicked => { root.save(root.draft); }
+                        }
+
+                        CheckBox {
+                            text: "Auto apply for lighting changes";
+                            checked <=> root.auto-lighting;
+                            enabled: root.editable;
+                            toggled => { root.auto-lighting-changed(self.checked); }
+                        }
+
+                        Rectangle {
+                            vertical-stretch: 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        VerticalLayout {
+
+            HorizontalLayout {
+                Text {
+                    text: "\{(root.dirty || root.map-dirty) ? "(Edited) " : ""}\{root.status}";
+                    color: Palette.foreground;
+                    wrap: word-wrap;
+                    accessible-role: text;
+                    accessible-label: root.status;
+                }
+            }
+
+            HorizontalLayout {
+                height: 22px;
+                Text {
+                    text: "TASOLLER configuration UI v\{root.app-version} by michioxd";
+                    color: Palette.foreground;
+                    font-size: 12px;
+                    opacity: 0.55;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    horizontal-stretch: 1;
+                }
+
+                FocusScope {
+                    width: 100px;
+                    accessible-role: button;
+                    accessible-label: "Open project on GitHub";
+                    key-pressed(event) => {
+                        if event.text == "\n" || event.text == " " { root.github-clicked(); return accept; }
+                        return reject;
+                    }
+                    Rectangle {
+                        background: transparent;
+                        border-width: parent.has-focus ? 2px : 0px;
+                        border-color: Palette.foreground;
+                    }
+
+                    link-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { parent.focus(); root.github-clicked(); }
+                    }
+
+                    Text {
+                        text: "Fork me on GitHub";
+                        color: Palette.accent-background;
+                        opacity: link-touch.has-hover ? 0.8 : 1;
+                        font-size: 12px;
+                        horizontal-alignment: right;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}

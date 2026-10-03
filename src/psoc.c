@@ -295,10 +295,13 @@ void UART1_IRQHandler(void) {
     }
 }
 
-static inline void _UART_Write(uint8_t u8Data) {
-    while (UART_IS_TX_FULL(UART1))
-        ;
+static inline uint8_t _UART_Write(uint8_t u8Data) {
+    uint32_t timeout = 100000;
+    while (UART_IS_TX_FULL(UART1)) {
+        if (--timeout == 0) return 0;
+    }
     UART_WRITE(UART1, u8Data);
+    return 1;
 }
 static inline void PSoC_Cmd(PSoC_CMD_TX eCmd, uint8_t u8D0, uint8_t u8D1, PSoC_CMD_RX eBlocking) {
     // The protocol for the PSoCs has no sync byte
@@ -310,11 +313,8 @@ static inline void PSoC_Cmd(PSoC_CMD_TX eCmd, uint8_t u8D0, uint8_t u8D1, PSoC_C
     // If the PSoC is totally non-responsive this will deadlock. For now that's probably fine. We
     // can add a retry counter down the line if it causes problems.
     do {
-        _UART_Write(eCmd);
-        _UART_Write(2);
-        _UART_Write(u8D0);
-        _UART_Write(u8D1);
-        _UART_Write(eCmd + 2 + u8D0 + u8D1);
+        if (!_UART_Write(eCmd) || !_UART_Write(2) || !_UART_Write(u8D0) ||
+            !_UART_Write(u8D1) || !_UART_Write(eCmd + 2 + u8D0 + u8D1)) return;
 
         if (eBlocking == _PSoC_CMD_RX_NONE) break;
         if (PSoC_Await_Command(eBlocking)) break;

@@ -1,5 +1,6 @@
 #pragma once
-#include "tasoller.h"
+#include <stdint.h>
+#include "_compiler.h"
 
 // 16 cells (0-15)
 #define CELL_0_Msk BIT15

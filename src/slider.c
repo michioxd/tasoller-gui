@@ -1,4 +1,7 @@
+#ifndef SLIDER_HOST_CHECK
 #include "tasoller.h"
+#endif
+#include "config_api.h"
 
 #define SLIDER_SYNC 0xFF
 #define SLIDER_MARK 0xFD
@@ -76,6 +79,88 @@ static void Slider_Send_Report_Byte(void) {
     Slider_Respond(SLIDER_CMD_Tx_RAW, (void*)&buffer, sizeof buffer);
 }
 static void Slider_Process(slider_cmd_Rx u8SliderCmd, uint8_t* pu8Packet, uint8_t u8NPacket) {
+    if (u8SliderCmd >= CONFIG_GET_INFO && u8SliderCmd <= CONFIG_SET_PROFILE) {
+        uint8_t response[2 + KEYMAP_SIZE] = { CONFIG_API_VERSION, CONFIG_OK };
+        uint8_t length = 2;
+        if (u8SliderCmd == CONFIG_SET_KEYMAP ? (u8NPacket != 41 && u8NPacket != 43) :
+            u8NPacket != (u8SliderCmd == CONFIG_SET ? 15 :
+                          u8SliderCmd == CONFIG_GET_PROFILE ? 2 :
+                          u8SliderCmd == CONFIG_SET_PROFILE ? 34 : 1))
+            response[1] = CONFIG_LENGTH;
+        else if (pu8Packet[0] != CONFIG_API_VERSION)
+            response[1] = CONFIG_VERSION;
+        else if (u8SliderCmd == CONFIG_SET && Config_Validate(pu8Packet + 1, 14))
+            response[1] = CONFIG_VALUE;
+        else if (u8SliderCmd == CONFIG_SET_KEYMAP &&
+             (u8NPacket == 41 ? !Keymap_Valid(pu8Packet + 1) :
+              !Keymap_GroupValid(pu8Packet + 3, pu8Packet[1], pu8Packet[2])))
+            response[1] = CONFIG_VALUE;
+          else if ((u8SliderCmd == CONFIG_GET_PROFILE || u8SliderCmd == CONFIG_SET_PROFILE) &&
+                 (pu8Packet[1] > KEYMAP_2K ||
+                (u8SliderCmd == CONFIG_SET_PROFILE && !Keymap_ProfileValid(pu8Packet + 2, pu8Packet[1]))))
+            response[1] = CONFIG_VALUE;
+        else if ((u8SliderCmd == CONFIG_SET || u8SliderCmd == CONFIG_SAVE ||
+                  u8SliderCmd == CONFIG_RESET || u8SliderCmd == CONFIG_SET_KEYMAP ||
+                  u8SliderCmd == CONFIG_SET_PROFILE) && gbUIOpen)
+            response[1] = CONFIG_BUSY;
+        else {
+            switch ((uint8_t)u8SliderCmd) {
+                case CONFIG_GET_INFO: {
+                    static const uint8_t info[16] = { 3, 1, 3, 0, 0x7F, 0, 0, 0,
+                                                      'T', 'A', 'S', '-', 'H', 'O', 'S', 'T' };
+                    memcpy(response + 2, info, sizeof info);
+                    length += sizeof info;
+                    break;
+                }
+                case CONFIG_GET:
+                    Config_Encode(&gConfig, response + 2);
+                    length += CONFIG_API_SIZE;
+                    break;
+                case CONFIG_SET:
+                case CONFIG_RESET: {
+                    uint8_t previousSens = gConfig.u8Sens;
+                    if (u8SliderCmd == CONFIG_SET) Config_Apply(&gConfig, pu8Packet + 1);
+                    else FMC_ConfigDefaults();
+                    if (previousSens != gConfig.u8Sens) PSoC_SetFingerCapacitanceFromConfig(0);
+                    break;
+                }
+                case CONFIG_SAVE:
+                    if (FMC_EEPROM_Save()) response[1] = CONFIG_STORAGE;
+                    break;
+                case CONFIG_GET_KEYMAP:
+                    memcpy(response + 2, gConfig.u8Keymap, KEYMAP_SIZE);
+                    length += KEYMAP_SIZE;
+                    break;
+                case CONFIG_SET_KEYMAP:
+                    // Complete validation above; all consumers run in the main loop.
+                    Keymap_Switch(&gConfig, u8NPacket == 43 ? pu8Packet[1] : KEYMAP_32K);
+                    memcpy(gConfig.u8Keymap, pu8Packet + (u8NPacket == 43 ? 3 : 1), KEYMAP_SIZE);
+                    Keymap_SetProfile(&gConfig, gConfig.u8KeyboardMode, gConfig.u8Keymap);
+                    if (u8NPacket == 43) gConfig.u8DividerMode = pu8Packet[2];
+                    break;
+                case CONFIG_GET_PROFILE:
+                    memcpy(response + 2, pu8Packet[1] == gConfig.u8KeyboardMode ?
+                           gConfig.u8Keymap : gConfig.u8KeymapProfiles[pu8Packet[1]], 32);
+                    length += 32;
+                    break;
+                case CONFIG_SET_PROFILE:
+                    Keymap_SetProfile(&gConfig, pu8Packet[1], pu8Packet + 2);
+                    break;
+                case CONFIG_GET_MODES:
+                    response[2] = gConfig.u8KeyboardMode;
+                    response[3] = gConfig.u8DividerMode;
+                    length += 2;
+                    break;
+                case CONFIG_GET_INPUT:
+                    memcpy(response + 2, gu8GroundData, 32);
+                    response[34] = gu8DigitalButtons;
+                    length += 33;
+                    break;
+            }
+        }
+        Slider_Respond((slider_cmd_Tx)u8SliderCmd, response, length);
+        return;
+    }
     switch (u8SliderCmd) {
         case SLIDER_CMD_Rx_RESET:
             // These three weren't present previously, but PSoC firmware suggests they should be
@@ -285,23 +370,36 @@ void Slider_TickSerial(void) {
     static uint8_t u8NRead = 0;
     static uint8_t u8Sum = 0;
     static uint8_t u8SliderCmd = 0;
+    static uint32_t lastByteMs = 0;
 
     static uint8_t u8Packet[0x61];  // The largest inbound packet expected is to set LEDs
 
+    if (su8State != SLIDER_PARSE_SYNC_WAIT && (uint32_t)(gu32NowMs - lastByteMs) >= 250) {
+        su8State = SLIDER_PARSE_SYNC_WAIT;
+        u8Mark = 0;
+    }
     // Make sure we flush the buffer!
     while (USB_VCOM_Available()) {
         uint8_t u8Byte = USB_VCOM_Read();
-        if (u8Byte == SLIDER_MARK) {
-            // Multiple marks in a row get folded down into a single mark
+        lastByteMs = gu32NowMs;
+        // Raw FF always resynchronizes; an escaped FF reaches the switch as data.
+        if (u8Byte == SLIDER_SYNC) {
+            su8State = SLIDER_PARSE_CMD;
+            u8Sum = SLIDER_SYNC;
+            u8Mark = 0;
+            continue;
+        }
+        if (su8State == SLIDER_PARSE_SYNC_WAIT) continue;
+        if (u8Mark) {
+            u8Mark = 0;
+            if (u8Byte != SLIDER_MARKED_SYNC && u8Byte != SLIDER_MARKED_MARK) {
+                su8State = SLIDER_PARSE_SYNC_WAIT;
+                continue;
+            }
+            u8Byte++;
+        } else if (u8Byte == SLIDER_MARK) {
             u8Mark = 1;
             continue;
-        } else if (u8Mark) {
-            u8Mark = 0;
-            // Only unescape if the byte was actually escaped
-            // A mark followed by any other byte is a no-op
-            if (u8Byte == SLIDER_MARKED_SYNC || u8Byte == SLIDER_MARKED_MARK) {
-                u8Byte++;
-            }
         }
 
         u8Sum += u8Byte;

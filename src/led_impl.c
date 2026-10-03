@@ -1,6 +1,7 @@
 #include <stdlib.h>
 
 #include "tasoller.h"
+#include "keymap.h"
 
 static inline uint8_t LED_ScaleU8(uint8_t u8V, uint8_t u8Scale) {
     // When using our custom firmware, don't perform scaling here because it'll be performed on the
@@ -14,7 +15,8 @@ static inline uint8_t LED_ScaleU8(uint8_t u8V, uint8_t u8Scale) {
 
 #define INDEX_IS_CELL(x) ((x) % 2 == 0)
 #define INDEX_IS_ACTIVE_CELL(x) (gu16PSoCDigital & (1 << ((x) >> 1)))
-#define INDEX_IS_SEPARATING_DIVIDER(x) (((x) >> 1) % 4 == 3)
+#define INDEX_IS_SEPARATING_DIVIDER(x) \
+    (gConfig.bEnableKeyboard ? Keymap_Divider(gConfig.u8DividerMode, (x)) : (((x) >> 1) % 4 == 3))
 #define INDEX_IS_LIT_DIVIDER(x) \
     (gu16PSoCDigital & (1 << ((x) >> 1)) && gu16PSoCDigital & (1 << (((x) >> 1) + 1)))
 

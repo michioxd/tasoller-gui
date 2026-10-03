@@ -1,6 +1,7 @@
 #pragma once
 
-#include <NUC123.h>
+#include <stdint.h>
+#include "_compiler.h"
 
 #define Config0 FMC_CONFIG_BASE
 #define Config1 FMC_CONFIG_BASE + 4
@@ -26,6 +27,8 @@ void FMC_Open(void);
 void FMC_Close(void);
 void FMC_EEPROM_Load(void);
 void FMC_EEPROM_Store(void);
+int FMC_EEPROM_Save(void);
+void FMC_ConfigDefaults(void);
 
 #define FMC_EEPROM_VERSION 0x01
 typedef struct __attribute__((aligned(4), packed)) {
@@ -58,6 +61,11 @@ typedef struct __attribute__((aligned(4), packed)) {
 
     // State data
     uint8_t u8NextBootLEDBootloader;
+    uint8_t u8Keymap[40];
+    uint8_t u8KeyboardMode;
+    uint8_t u8DividerMode;
+    uint8_t u8KeymapProfiles[6][32];
 } flash_t;
+_Static_assert(sizeof(flash_t) == 380 && sizeof(flash_t) <= 512, "config must fit one data-flash page");
 extern flash_t gConfig;
 extern uint8_t bConfigDirty;
