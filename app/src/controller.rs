@@ -444,7 +444,7 @@ pub fn bind(ui: &AppWindow) -> Result<slint::Timer, std::io::Error> {
     ui.on_select_divider(move |divider| {
         if let Some(ui) = weak
             .upgrade()
-            .filter(|ui| ui.get_connected() && !ui.get_busy() && ui.get_draft().keyboard)
+            .filter(|ui| ui.get_connected() && !ui.get_busy())
             && (0..7).contains(&divider)
         {
             ui.set_divider_mode(divider);

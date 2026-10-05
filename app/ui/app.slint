@@ -9,6 +9,9 @@ import {
     StyleMetrics,
     VerticalBox,
     HorizontalBox,
+    AboutSlint,
+    ProgressIndicator,
+    Spinner,
 } from "std-widgets.slint";
 
 export struct Settings {
@@ -38,6 +41,8 @@ component InputTile inherits Rectangle {
     in property <int> raw-start: -1;
     in property <int> raw-width: 1;
     in property <[int]> raw-levels;
+    in property <bool> keyboard-mode: false;
+
     callback chosen();
     background: Palette.alternate-background.with-alpha(0.35);
     border-color: focus.has-focus || root.selected ? Palette.accent-background : Palette.border;
@@ -77,7 +82,7 @@ component InputTile inherits Rectangle {
             opacity: 0.7;
         }
 
-        Text {
+        if keyboard-mode: Text {
             text: root.key-label;
             color: Palette.foreground;
             horizontal-alignment: center;
@@ -91,7 +96,7 @@ component InputTile inherits Rectangle {
         alignment: center;
         spacing: StyleMetrics.layout-spacing;
 
-        Text {
+        if keyboard-mode: Text {
             text: root.key-label;
             color: Palette.foreground;
             horizontal-alignment: center;
@@ -171,10 +176,10 @@ component NumberField inherits VerticalLayout {
 
 export component AppWindow inherits Window {
     title: "TASOLLER configuration UI v\{root.app-version}";
-    preferred-width: 1280px;
-    preferred-height: 860px;
-    min-width: 1100px;
-    min-height: 900px;
+    preferred-width: 1100px;
+    preferred-height: 800px;
+    min-width: 900px;
+    min-height: 680px;
     in property <bool> backdrop-enabled: false;
     background: root.backdrop-enabled ? transparent : Palette.background;
     in property <brush> surface-background: root.backdrop-enabled
@@ -188,7 +193,7 @@ export component AppWindow inherits Window {
     in property <bool> connected: false;
     in property <bool> busy: false;
     in property <bool> error: false;
-    in property <string> status: "Discovering compatible devices…";
+    in property <string> status: "Discovering compatible devices...";
     in property <string> device-info;
     in property <string> app-version: "?.?.?";
     in property <[int]> draft-map;
@@ -295,7 +300,7 @@ export component AppWindow inherits Window {
             }
 
             Label {
-                text: "No TASOLLER device connected!";
+                text: "Waiting for TASOLLER to connect...";
                 color: Palette.foreground;
                 font-size: 1.6rem;
                 font-weight: 600;
@@ -303,7 +308,7 @@ export component AppWindow inherits Window {
             }
 
             Label {
-                text: "Please connect TASOLLER (ORIGIN) to a compatible COM port and click Connect.\nMake sure your device is running the firmware that released with this UI version. Otherwise, the UI may not work correctly or refuse to connect.";
+                text: "Please connect TASOLLER to a compatible COM port and click Connect.\nMake sure your device is running the firmware that released with this UI version. Otherwise, the UI may not work correctly or refuse to connect.\nTASOLLER PLUS can't be used with this UI.";
                 color: Palette.foreground;
                 font-size: 1rem;
                 opacity: 0.7;
@@ -319,36 +324,46 @@ export component AppWindow inherits Window {
         if root.connected: VerticalLayout {
             spacing: 2 * StyleMetrics.layout-spacing;
 
-            VerticalLayout {
-                Text {
-                    text: "AIR";
-                    font-weight: 600;
-                    height: 22px;
-                }
-
-                VerticalLayout {
-                    spacing: StyleMetrics.layout-spacing;
-                    for level in 6: HorizontalLayout {
-                        spacing: StyleMetrics.layout-spacing;
-
-                        InputTile {
-                            label: "\{6 - level}";
-                            key-label: !root.draft.keyboard ? "" : root.key-labels[39 - level] == "" ? "UN" : root.key-labels[39 - level];
-                            level: root.input-levels[39 - level];
-                            selected: root.selected-slot == 39 - level;
-                            enabled: root.editable;
-                            height: 25px;
-                            horizontal-stretch: 0;
-
-                            chosen => { root.select-input(39 - level); }
-                            horizontal: true;
-                        }
-                    }
-                }
-            }
-
             HorizontalLayout {
                 spacing: StyleMetrics.layout-spacing;
+                vertical-stretch: 1;
+
+                VerticalLayout {
+                    min-width: 60px;
+
+                    Text {
+                        text: "AIR";
+                        font-weight: 600;
+                        height: 22px;
+                        horizontal-alignment: TextHorizontalAlignment.center;
+                    }
+
+                    VerticalLayout {
+                        spacing: StyleMetrics.layout-spacing;
+
+                        for level in 6: HorizontalLayout {
+                            spacing: StyleMetrics.layout-spacing;
+
+                            InputTile {
+                                label: "\{6 - level}";
+                                key-label: !root.draft.keyboard ? "" : root.key-labels[39 - level] == "" ? "UN" : root.key-labels[39 - level];
+                                level: root.input-levels[39 - level];
+                                selected: root.selected-slot == 39 - level;
+                                enabled: root.editable;
+                                height: 25px;
+
+                                chosen => { root.select-input(39 - level); }
+                                keyboard-mode: root.draft.keyboard && root.keyboard-mode != 0;
+                                horizontal: true;
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        vertical-stretch: 1;
+                    }
+                }
+
                 if !root.draft.keyboard || root.keyboard-mode == 0: VerticalLayout {
                     spacing: StyleMetrics.layout-spacing;
                     for row in 2: HorizontalLayout {
@@ -357,13 +372,16 @@ export component AppWindow inherits Window {
                             label: "\{(15 - region) * 2 + row + 1}";
                             key-label: root.draft.keyboard ? root.key-labels[(15 - region) * 2 + row] : "";
                             level: root.input-levels[(15 - region) * 2 + row];
-                            selected: root.selected-slot == (15 - region) * 2 + row;
+                            selected: root.selected-slot == (15 - region) * 2 + row && root.keyboard-mode != 0;
                             enabled: root.editable;
                             min-height: 76px;
+                            vertical-stretch: 1;
                             chosen => { root.select-input((15 - region) * 2 + row); }
+                            keyboard-mode: root.draft.keyboard && root.keyboard-mode != 0;
                         }
                     }
                 }
+
                 if root.draft.keyboard && root.keyboard-mode != 0: HorizontalLayout {
                     spacing: StyleMetrics.layout-spacing;
                     for start[group] in root.group-starts: InputTile {
@@ -377,6 +395,8 @@ export component AppWindow inherits Window {
                         selected: root.selected-slot == start;
                         enabled: root.editable;
                         min-height: 152px + StyleMetrics.layout-spacing;
+                        vertical-stretch: 1;
+                        keyboard-mode: root.draft.keyboard && root.keyboard-mode != 0;
                         chosen => { root.select-input(start); }
                     }
                 }
@@ -451,7 +471,7 @@ export component AppWindow inherits Window {
                         keyboard-toggle := CheckBox {
                             private property <bool> device-keyboard: root.draft.keyboard;
                             changed device-keyboard => { self.checked = self.device-keyboard; }
-                            text: "Enable keyboard output";
+                            text: "Enable keyboard mode";
                             checked <=> root.draft.keyboard;
                             enabled: root.editable;
                         }
@@ -483,7 +503,7 @@ export component AppWindow inherits Window {
                             divider-selector := ComboBox {
                                 private property <int> device-divider: root.divider-mode == 3 ? 1 : root.divider-mode > 3 ? root.divider-mode - 1 : root.divider-mode;
                                 changed device-divider => { self.current-index = self.device-divider; }
-                                enabled: root.editable && root.draft.keyboard;
+                                enabled: root.editable;
                                 horizontal-stretch: 1;
                                 model: ["No divider", "Single", "All", "4k", "8k", "9k"];
                                 current-index: self.device-divider;
